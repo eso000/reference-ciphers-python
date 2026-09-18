@@ -1,7 +1,7 @@
 from encryptionBase import *
 
 
-class Serpent(encryptionBase):
+class Serpent(EncryptionBase):
     SBoxes = [[[ 3, 8,15, 1,10, 6, 5,11,14,13, 4, 2, 7, 0, 9,12 ],#SB
                     [15,12, 2, 7, 9, 0, 5,10, 1,11,14, 8, 6,13, 3, 4 ],
                     [ 8, 6, 7, 9, 3,12,10,15,13, 1,14, 4, 0,11, 5, 2 ],
@@ -29,10 +29,9 @@ class Serpent(encryptionBase):
         return (((a<<s)|(a>> n-s))%(2**n))
 
 
-    def applySBox(self, X, n, d = 0):
+    def applySBox_bit(self, X, n, d = 0):
         Xn =[0,0,0,0]
         for x in range(32):
-
             newbits = self.SBoxes[d][n][((X[0]>>x)%2) <<0 |
                                          ((X[1]>>x)%2) <<1 |
                                          ((X[2]>>x)%2) <<2 |
@@ -42,11 +41,356 @@ class Serpent(encryptionBase):
             Xn[2] |= ((newbits >> 2)%2) << x
             Xn[3] |= ((newbits >> 3)%2) << x
         return Xn
-    
+
+    def applySBox(self, X,n, d=0):
+        r0, r1, r2, r3 = X
+        if (d == 0):
+            if (n == 0):
+                r3 ^= r0
+                r4 = r1
+                r1 &= r3
+                r4 ^= r2
+                r1 ^= r0
+                r0 |= r3
+                r0 ^= r4
+                r4 ^= r3
+                r3 ^= r2
+                r2 |= r1
+                r2 ^= r4
+                r4 ^= 0xffffffff
+                r4 |= r1
+                r1 ^= r3
+                r1 ^= r4
+                r3 |= r0
+                r1 ^= r3
+                r4 ^= r3
+                return [r1, r4, r2, r0]
+
+            if (n == 1):
+                r0 ^= 0xffffffff
+                r2 ^= 0xffffffff
+                r4 = r0
+                r0 &= r1
+                r2 ^= r0
+                r0 |= r3
+                r3 ^= r2
+                r1 ^= r0
+                r0 ^= r4
+                r4 |= r1
+                r1 ^= r3
+                r2 |= r0
+                r2 &= r4
+                r0 ^= r1
+                r1 &= r2
+                r1 ^= r0
+                r0 &= r2
+                r0 ^= r4
+                return [r2, r0, r3, r1]
+
+            if(n == 2):
+                r4 = r0
+                r0 &= r2
+                r0 ^= r3
+                r2 ^= r1
+                r2 ^= r0
+                r3 |= r4
+                r3 ^= r1
+                r4 ^= r2
+                r1 = r3
+                r3 |= r4
+                r3 ^= r0
+                r0 &= r1
+                r4 ^= r0
+                r1 ^= r3
+                r1 ^= r4
+                r4 ^= 0xffffffff
+                return [r2, r3, r1, r4]
+
+            if(n == 3):
+                r4 = r0
+                r0 |= r3
+                r3 ^= r1
+                r1 &= r4
+                r4 ^= r2
+                r2 ^= r3
+                r3 &= r0
+                r4 |= r1
+                r3 ^= r4
+                r0 ^= r1
+                r4 &= r0
+                r1 ^= r3
+                r4 ^= r2
+                r1 |= r0
+                r1 ^= r2
+                r0 ^= r3
+                r2 = r1
+                r1 |= r3
+                r1 ^= r0
+                return [r1, r2, r3, r4]
+
+            if(n == 4):
+                r1 ^= r3
+                r3 ^= 0xffffffff
+                r2 ^= r3
+                r3 ^= r0
+                r4 = r1
+                r1 &= r3
+                r1 ^= r2
+                r4 ^= r3
+                r0 ^= r4
+                r2 &= r4
+                r2 ^= r0
+                r0 &= r1
+                r3 ^= r0
+                r4 |= r1
+                r4 ^= r0
+                r0 |= r3
+                r0 ^= r2
+                r2 &= r3
+                r0 ^= 0xffffffff
+                r4 ^= r2
+                return [r1, r4, r0, r3]
+
+            if(n == 5):
+                r0 ^= r1
+                r1 ^= r3
+                r3 ^= 0xffffffff
+                r4 = r1
+                r1 &= r0
+                r2 ^= r3
+                r1 ^= r2
+                r2 |= r4
+                r4 ^= r3
+                r3 &= r1
+                r3 ^= r0
+                r4 ^= r1
+                r4 ^= r2
+                r2 ^= r0
+                r0 &= r3
+                r2 ^= 0xffffffff
+                r0 ^= r4
+                r4 |= r3
+                r2 ^= r4
+                return [r1, r3, r0, r2]
+
+            if(n == 6):
+                r2 ^= 0xffffffff
+                r4 = r3
+                r3 &= r0
+                r0 ^= r4
+                r3 ^= r2
+                r2 |= r4
+                r1 ^= r3
+                r2 ^= r0
+                r0 |= r1
+                r2 ^= r1
+                r4 ^= r0
+                r0 |= r3
+                r0 ^= r2
+                r4 ^= r3
+                r4 ^= r0
+                r3 ^= 0xffffffff
+                r2 &= r4
+                r2 ^= r3
+                return [r0, r1, r4, r2]
+
+            if(n == 7):
+                r4 = r1
+                r1 |= r2
+                r1 ^= r3
+                r4 ^= r2
+                r2 ^= r1
+                r3 |= r4
+                r3 &= r0
+                r4 ^= r2
+                r3 ^= r1
+                r1 |= r4
+                r1 ^= r0
+                r0 |= r4
+                r0 ^= r2
+                r1 ^= r4
+                r2 ^= r1
+                r1 &= r0
+                r1 ^= r4
+                r2 ^= 0xffffffff
+                r2 |= r0
+                r4 ^= r2
+                return [r4, r3, r1, r0]
+        if(n == 0):
+            r2 ^= 0xffffffff
+            r4 = r1
+            r1 |= r0
+            r4 ^= 0xffffffff
+            r1 ^= r2
+            r2 |= r4
+            r1 ^= r3
+            r0 ^= r4
+            r2 ^= r0
+            r0 &= r3
+            r4 ^= r0
+            r0 |= r1
+            r0 ^= r2
+            r3 ^= r4
+            r2 ^= r1
+            r3 ^= r0
+            r3 ^= r1
+            r2 &= r3
+            r4 ^= r2
+            return [r0, r4, r1, r3]
+        if (n == 1):
+            r4 = r1
+            r1 ^= r3
+            r3 &= r1
+            r4 ^= r2
+            r3 ^= r0
+            r0 |= r1
+            r2 ^= r3
+            r0 ^= r4
+            r0 |= r2
+            r1 ^= r3
+            r0 ^= r1
+            r1 |= r3
+            r1 ^= r0
+            r4 ^= 0xffffffff
+            r4 ^= r1
+            r1 |= r0
+            r1 ^= r0
+            r1 |= r4
+            r3 ^= r1
+            return [r4, r0, r3, r2]
+
+        if (n == 2):
+            r2 ^= r3
+            r3 ^= r0
+            r4 = r3
+            r3 &= r2
+            r3 ^= r1
+            r1 |= r2
+            r1 ^= r4
+            r4 &= r3
+            r2 ^= r3
+            r4 &= r0
+            r4 ^= r2
+            r2 &= r1
+            r2 |= r0
+            r3 ^= 0xffffffff
+            r2 ^= r3
+            r0 ^= r3
+            r0 &= r1
+            r3 ^= r4
+            r3 ^= r0
+            return [r1, r4, r2, r3]
+
+        if (n == 3):
+            r4 = r2
+            r2 ^= r1
+            r0 ^= r2
+            r4 &= r2
+            r4 ^= r0
+            r0 &= r1
+            r1 ^= r3
+            r3 |= r4
+            r2 ^= r3
+            r0 ^= r3
+            r1 ^= r4
+            r3 &= r2
+            r3 ^= r1
+            r1 ^= r0
+            r1 |= r2
+            r0 ^= r3
+            r1 ^= r4
+            r0 ^= r1
+            return [r2, r1, r3, r0]
+        if (n == 4):
+            r4 = r2
+            r2 &= r3
+            r2 ^= r1
+            r1 |= r3
+            r1 &= r0
+            r4 ^= r2
+            r4 ^= r1
+            r1 &= r2
+            r0 ^= 0xffffffff
+            r3 ^= r4
+            r1 ^= r3
+            r3 &= r0
+            r3 ^= r2
+            r0 ^= r1
+            r2 &= r0
+            r3 ^= r0
+            r2 ^= r4
+            r2 |= r3
+            r3 ^= r0
+            r2 ^= r1
+            return [r0, r3, r2, r4]
+        if (n == 5):
+            r1 ^= 0xffffffff
+            r4 = r3
+            r2 ^= r1
+            r3 |= r0
+            r3 ^= r2
+            r2 |= r1
+            r2 &= r0
+            r4 ^= r3
+            r2 ^= r4
+            r4 |= r0
+            r4 ^= r1
+            r1 &= r2
+            r1 ^= r3
+            r4 ^= r2
+            r3 &= r4
+            r4 ^= r1
+            r3 ^= r4
+            r4 ^= 0xffffffff
+            r3 ^= r0
+            return [r1, r4, r3, r2]
+        if (n == 6):
+            r0 ^= r2
+            r4 = r2
+            r2 &= r0
+            r4 ^= r3
+            r2 ^= 0xffffffff
+            r3 ^= r1
+            r2 ^= r3
+            r4 |= r0
+            r0 ^= r2
+            r3 ^= r4
+            r4 ^= r1
+            r1 &= r3
+            r1 ^= r0
+            r0 ^= r3
+            r0 |= r2
+            r3 ^= r1
+            r4 ^= r0
+            return [r1, r2, r4, r3]
+        if (n == 7):
+            r4 = r2
+            r2 ^= r0
+            r0 &= r3
+            r4 |= r3
+            r2 ^= 0xffffffff
+            r3 ^= r1
+            r1 |= r0
+            r0 ^= r2
+            r2 &= r4
+            r3 &= r4
+            r1 ^= r2
+            r2 ^= r0
+            r0 |= r2
+            r4 ^= r1
+            r0 ^= r3
+            r3 ^= r4
+            r4 |= r0
+            r3 ^= r2
+            r4 ^= r2
+            return [r3, r0, r1, r4]
+        return X
+
+
     def generateKeys(self,key):
         key = self.pad(key,int(256/4),'bit')
         key = key[0:int(256/4)]
-        key = self.HexToBin_le(key)
+        key = self.hex_to_bin_le(key)
         w = [ int(key[i:i+32],2) for i in range(0,256,32) ]
         for i in range(8, 140):
             wi = w[i - 8]^ w[i - 5]^ w[i - 3]^ w[i - 1]^2644438137^ int((bin(i-8)[2:].zfill(32))[::-1],2)
@@ -85,7 +429,7 @@ class Serpent(encryptionBase):
 
     
     def encrypt_block(self, X):
-        X = self.HexToBin_le(X)
+        X = self.hex_to_bin_le(X)
         X = [int(X[32*i:32*i+32],2) for i in range(4)]
         for x in range(32):
             X = [X[i]^self.Subkeys[x][i] for i in range(4)]
@@ -94,12 +438,12 @@ class Serpent(encryptionBase):
                 break
             X = self.LT(X)
         X = "".join([bin(X[i]^self.Subkeys[32][i])[2:].zfill(32) for i in range(4)])
-        return self.BinToHex_le(X)
+        return self.bin_to_hex_le(X)
 
 
 
     def decrypt_block(self,X):
-        X = self.HexToBin_le(X)
+        X = self.hex_to_bin_le(X)
         X = [int(X[32*i:32*i+32],2) for i in range(4)]
         X = [X[i]^self.Subkeys[32][i] for i in range(4)]
         X = self.applySBox(X,int(31%8),d=1)
@@ -109,7 +453,7 @@ class Serpent(encryptionBase):
             X = self.applySBox(X,int((30-x)%8),d=1)
             X = [X[i]^self.Subkeys[30-x][i] for i in range(4)]
         X = "".join([bin(X[i])[2:].zfill(32) for i in range(4)])
-        return self.BinToHex_le(X)
+        return self.bin_to_hex_le(X)
 
 
 

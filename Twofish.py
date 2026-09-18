@@ -1,6 +1,6 @@
 from encryptionBase import *
 
-class Twofish(encryptionBase):
+class Twofish(EncryptionBase):
 
 	def rotl(self, a,s,n):
 		return (((a>>s)|(a<< n-s))%(2**n))
@@ -141,7 +141,7 @@ class Twofish(encryptionBase):
 			key = self.pad(key,64,'0')
 		else:
 			key = key[0:64]
-		key = self.HexToBin(key)
+		key = self.hex_to_bin(key)
 
 		m = [ int(key[i:i+8],2) for i in range(0, len(key), 8) ]
 		S = []

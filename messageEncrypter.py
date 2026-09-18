@@ -32,7 +32,7 @@ def make_key():
 
 def encrypt():
 	text = clear_edit.get(1.0, tk.END)
-	text = d.BinToHex(d.StringToBin(text[0:len(text)-1]))
+	text = d.bin_to_hex(d.string_to_bin(text[0:len(text)-1]))
 	text = d.encrypt(text,mode =  mode.get(), padding = padding.get(),
 		 iv = iv_field.get(1.0, tk.END)[0:len(iv_field.get(1.0, tk.END))-1])
 	cipher_edit.delete(1.0, tk.END)
@@ -43,7 +43,7 @@ def decrypt():
 	text = cipher_edit.get(1.0, tk.END)
 	text = d.decrypt(text[0:len(text)-1], mode.get(),padding.get(), 
 			iv = iv_field.get(1.0, tk.END)[0:len(iv_field.get(1.0, tk.END))-1])
-	text = d.BinToString(d.HexToBin(text))
+	text = d.bin_to_string(d.hex_to_bin(text))
 	clear_edit.delete(1.0, tk.END)
 	clear_edit.insert(tk.END, text)
 
