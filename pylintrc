@@ -1,0 +1,24 @@
+[MASTER]
+# This is a teaching library; the "unfixable" refactor warnings below are
+# silenced because the code is deliberately written step-by-step for legibility:
+#  - too-many-lines:   Blowfish's 1149 spec-table (P/S-box data) lines.
+#  - too-many-*:       Serpent's hardcoded 16 S-box gate networks and
+#                      Twofish's verbose key schedule.
+#  - arguments-differ: rotl/rotr re-define the base-class (list) signature for
+#                      integer rotation - an intentional, documented override.
+#  - too-many-arguments/positional: encrypt_mode/decrypt_mode expose the
+#                      block/mode/padding/iv interface as a flat, teachable API.
+
+[BASIC]
+# Module files carry proper-cased cipher names (AES.py, Twofish.py, ...).
+module-rgx=^([a-z_][a-z0-9_]*|[A-Z][a-zA-Z0-9]*)$
+
+[MESSAGES CONTROL]
+disable=too-many-lines,
+    too-many-return-statements,
+    too-many-branches,
+    too-many-locals,
+    too-many-statements,
+    arguments-differ,
+    too-many-arguments,
+    too-many-positional-arguments
