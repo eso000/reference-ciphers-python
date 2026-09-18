@@ -1,6 +1,6 @@
 from encryptionBase import *
 
-class DES(encryptionBase):
+class DES(EncryptionBase):
 	initialperm = [ 58, 50, 42, 34, 26, 18, 10, 2,
                 60, 52, 44, 36, 28, 20, 12, 4,
                 62, 54, 46, 38, 30, 22, 14, 6,
@@ -66,7 +66,7 @@ class DES(encryptionBase):
 	def generateKeys(self,key):
 		if len(key) < 16:
 			key = self.pad(key,16,'0')
-		key = self.HexToBin(key)
+		key = self.hex_to_bin(key)
 		key = [key[i-1] for i in self.keyperm1]#self.permutate(key, self.keyperm1)
 		leftKey = key[0:28]
 		rightKey = key[28:56]
@@ -89,7 +89,7 @@ class DES(encryptionBase):
 		return ''.join([sbox_str[i-1] for i in self.PBox])
 
 	def encrypt_block(self,plaintext):
-		plaintext = self.HexToBin(plaintext)
+		plaintext = self.hex_to_bin(plaintext)
 		plaintext = "".join([ plaintext[i-1] for i in self.initialperm])
 		left = plaintext[0:32]
 		right = plaintext[32:64] 
@@ -101,10 +101,10 @@ class DES(encryptionBase):
 			left = new_left
 			right = new_right
 		x = right + left
-		return self.BinToHex("".join([x[i-1] for i in self.inverseperm]))
+		return self.bin_to_hex("".join([x[i-1] for i in self.inverseperm]))
 
 	def decrypt_block(self,plaintext):
-		plaintext = self.HexToBin(plaintext)
+		plaintext = self.hex_to_bin(plaintext)
 		plaintext = self.permutate(plaintext, self.initialperm)
 		left = plaintext[0:32]
 		right = plaintext[32:64] 
@@ -115,7 +115,7 @@ class DES(encryptionBase):
 			
 			left = new_left
 			right = new_right
-		return self.BinToHex(self.permutate(right + left, self.inverseperm))
+		return self.bin_to_hex(self.permutate(right + left, self.inverseperm))
 
 	def encrypt(self, plaintext,mode = 'CBC',padding = 'bit',iv = ''):
 		return self.encrypt_mode(16,plaintext, mode, padding, iv)
@@ -124,7 +124,7 @@ class DES(encryptionBase):
 		return self.decrypt_mode(16,plaintext, mode, padding, iv)
 
 
-class TrippleDES(encryptionBase):
+class TrippleDES(EncryptionBase):
 	des1 = DES()
 	des2 = DES()
 	des3 = DES()

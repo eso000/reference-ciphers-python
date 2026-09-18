@@ -25,7 +25,7 @@ def open_file():
         for x in text:
             s = s + hex(x)[2:].zfill(2)
         text = d.decrypt(s, mode.get(),padding.get())
-        text = d.BinToString(d.HexToBin(text))
+        text = d.bin_to_string(d.hex_to_bin(text))
         Textedit.insert(tk.END, text)
     window.title(f"Text Editor Application - {filepath}")
 
@@ -39,7 +39,7 @@ def save_file():
         return
     with open(filepath, "wb") as output_file:
         text = Textedit.get(1.0, tk.END)
-        text = d.BinToHex(d.StringToBin(text[0:len(text)-1]))
+        text = d.bin_to_hex(d.string_to_bin(text[0:len(text)-1]))
         text = d.encrypt(text, mode.get(),padding.get())
         text = bytes.fromhex(text)
         output_file.write(text)
