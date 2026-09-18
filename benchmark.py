@@ -1,4 +1,4 @@
-from encryptionBase import *
+from encryption_base import *
 from AES import *
 from Serpent import *
 from Blowfish import *
@@ -19,7 +19,7 @@ x.append(Twofish())
 for d in x:
     #print(type(d), end = "\t")
     startTime = time.time()
-    d.generateKeys('0')
+    d.generate_keys('0')
     #print(time.time() - startTime)
 b_size = 4000
 b = '0'*b_size

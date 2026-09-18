@@ -1,4 +1,4 @@
-from encryptionBase import *
+from encryption_base import *
 from AES import *
 from Serpent import *
 from Blowfish import *
@@ -47,7 +47,7 @@ def encrypt():
         fp.write(s)
 
 d = AES()
-d.generateKeys('0')
+d.generate_keys('0')
 
 def make_key():
 	global d
@@ -63,7 +63,7 @@ def make_key():
 		d = DES()
 	if encryptalg.get() == '3DES':
 		d = TrippleDES() 
-	d.generateKeys(password.get(1.0, tk.END)[0:len(password.get(1.0, tk.END))-1])
+	d.generate_keys(password.get(1.0, tk.END)[0:len(password.get(1.0, tk.END))-1])
 
 
 window = tk.Tk()
