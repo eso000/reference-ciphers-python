@@ -73,18 +73,19 @@ def matmulgf(mat, vec, pol):
 
 class Twofish(EncryptionBase):
     """Twofish cipher; 128-bit blocks with 128/192/256-bit keys."""
+
+    def __init__(self):
+        self.subkeys = []
+        self.sbox0 = []
+        self.sbox1 = []
+        self.sbox2 = []
+        self.sbox3 = []
+
     def rotl(self, a, s, n):
         return ((a >> s) | (a << n - s)) % (2**n)
 
     def rotr(self, a, s, n):
         return ((a << s) | (a >> n - s)) % (2**n)
-
-    subkeys = []
-
-    sbox0 = []
-    sbox1 = []
-    sbox2 = []
-    sbox3 = []
 
     def q(self, x, i=0):
         """Apply the q0/q1 4-bit permutation network to one byte."""

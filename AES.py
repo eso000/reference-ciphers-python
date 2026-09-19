@@ -74,7 +74,8 @@ def gmul(a, b):
 class AES(EncryptionBase):
     """AES cipher; supports 128/192/256-bit keys and 128-bit blocks."""
 
-    subkeys = []
+    def __init__(self):
+        self.subkeys = []
 
     def sub_bytes(self, s):
         """Substitute each state byte through the AES S-box (FIPS-197 5.1.1)."""

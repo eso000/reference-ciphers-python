@@ -37,7 +37,8 @@ PHI = 2644438137
 class Serpent(EncryptionBase):
     """Serpent cipher; 128-bit blocks and keys, 32 rounds."""
 
-    subkeys = []
+    def __init__(self):
+        self.subkeys = []
 
     @staticmethod
     def _bitrev8(v):
