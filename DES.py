@@ -105,7 +105,8 @@ P = [
 class DES(EncryptionBase):
     """DES cipher; 64-bit blocks with 16 hex-character keys."""
 
-    subkeys = []
+    def __init__(self):
+        self.subkeys = []
 
     def generate_keys(self, key):
         """Derive the 16 round subkeys from a 64-bit (16 hex char) key."""
@@ -177,9 +178,11 @@ class DES(EncryptionBase):
 
 class TrippleDES(EncryptionBase):
     """Three-key triple DES: Encrypt-Decrypt-Encrypt over three DES instances."""
-    des1 = DES()
-    des2 = DES()
-    des3 = DES()
+
+    def __init__(self):
+        self.des1 = DES()
+        self.des2 = DES()
+        self.des3 = DES()
 
     def encrypt_block(self, plt):
         """Encrypt one 64-bit block given as 16 hex characters."""
