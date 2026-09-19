@@ -1,5 +1,7 @@
 """Twofish (Schneier et al., 1998), implemented step by step for teaching."""
 
+from typing import List, Union
+
 from encryption_base import EncryptionBase
 
 # RS matrix (Twofish, Schneier/Kelsey/Whiting/Wagner/Hall/Ferguson 1998,
@@ -44,7 +46,7 @@ RS_POLY = (1 << 8) + (1 << 6) + (1 << 3) + (1 << 2) + 1  # 0x014D
 RHO = (1 << 24) + (1 << 16) + (1 << 8) + 1
 
 
-def multgf(a, b, pol):
+def multgf(a: int, b: int, pol: int) -> int:
     """Multiply two bytes in GF(2^8) with reduction polynomial pol."""
     if b == 0:
         return 0
@@ -59,7 +61,7 @@ def multgf(a, b, pol):
     return p
 
 
-def matmulgf(mat, vec, pol):
+def matmulgf(mat: List[List[int]], vec: List[int], pol: int) -> int:
     """Mix a byte vector with a matrix over GF(2^8), packing rows into a
     32-bit word (row 0 of the matrix = most significant byte)."""
     result = 0
@@ -75,19 +77,22 @@ class Twofish(EncryptionBase):
     """Twofish cipher; 128-bit blocks with 128/192/256-bit keys."""
 
     def __init__(self):
-        self.subkeys = []
-        self.sbox0 = []
-        self.sbox1 = []
-        self.sbox2 = []
-        self.sbox3 = []
+        self.subkeys: List[int] = []
+        self.sbox0: List[int] = []
+        self.sbox1: List[int] = []
+        self.sbox2: List[int] = []
+        self.sbox3: List[int] = []
 
-    def rotl(self, a, s, n):
+    def get_block_size(self) -> int:
+        return 16  # 128 bits = 16 bytes
+
+    def rotl(self, a: int, s: int, n: int) -> int:
         return ((a >> s) | (a << n - s)) % (2**n)
 
-    def rotr(self, a, s, n):
+    def rotr(self, a: int, s: int, n: int) -> int:
         return ((a << s) | (a >> n - s)) % (2**n)
 
-    def q(self, x, i=0):
+    def q(self, x: int, i: int = 0) -> int:
         """Apply the q0/q1 4-bit permutation network to one byte."""
         a0 = int(x / 16)
         b0 = int(x % 16)
@@ -103,12 +108,12 @@ class Twofish(EncryptionBase):
         b2 = TQ[i][3][b2]
         return 16 * b2 + a2
 
-    def g(self, x):
+    def g(self, x: int) -> int:
         """Key-dependent round function: the four keyed S-boxes XORed together."""
         x = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
         return self.sbox0[x[0]] ^ self.sbox1[x[1]] ^ self.sbox2[x[2]] ^ self.sbox3[x[3]]
 
-    def h(self, x, l0):
+    def h(self, x: int, l0: List[List[int]]) -> int:
         """Interleave q permutations with the key vector, then mix through the MDS matrix."""
         x = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
         if len(l0) == 4:
@@ -139,7 +144,7 @@ class Twofish(EncryptionBase):
 
         return self.mds_lt_m([x[0], x[1], x[2], x[3]])
 
-    def mds_lt_m(self, vec):
+    def mds_lt_m(self, vec: List[int]) -> int:
         """Mix a 4-byte vector through the MDS matrix (Twofish, Section 2.2).
         Row v of the matrix lands in byte lane v; this is the little-endian
         companion of matmulgf."""
@@ -151,24 +156,24 @@ class Twofish(EncryptionBase):
             result = result + new_val * 2 ** (8 * v)
         return result
 
-    def pht(self, a, b):
+    def pht(self, a: int, b: int):
         """Pseudo-Hadamard Transform of two 32-bit words."""
         num1 = (a + b) % (2**32)
         num2 = (a + 2 * b) % (2**32)
         return num1, num2
 
-    def generate_keys(self, key):
+    def generate_keys(self, key: Union[bytes, str]) -> None:
         """Derive subkeys and key S-boxes.
 
         The key is read as hex bytes; each four-byte group forms a 32-bit
         word with its first byte most significant (big-endian), matching the
         Twofish key expansion. Words for the rounds themselves are
-        little-endian (see hex_to_words_le).
+        little-endian (see bytes_to_words_le).
         """
-        key = self.pad_key_hex(key, [32, 48, 64])
-        key = self.hex_to_bin(key)
-
-        m = [int(key[i : i + 8], 2) for i in range(0, len(key), 8)]
+        if isinstance(key, str):
+            key = self.hex_to_bytes(key)
+        key = self.hex_to_bytes(self.pad_key_hex(key.hex(), [32, 48, 64]))
+        m = list(key)
         s = []
         for t in range(0, len(m), 8):
             s.append(matmulgf(RS, m[t : t + 8], RS_POLY))
@@ -280,24 +285,22 @@ class Twofish(EncryptionBase):
         self.subkeys = keys
 
     @staticmethod
-    def hex_to_words_le(hex_str):
-        """Split a 128-bit hex block into four 32-bit little-endian words.
+    def bytes_to_words_le(data: bytes) -> List[int]:
+        """Split a 128-bit block into four 32-bit little-endian words.
 
         Twofish is little-endian: each 4-byte group is read with its
-        least-significant byte first, so the hex block "54686174..." becomes
-        the word 0x74616854.
+        least-significant byte first.
         """
-        data = bytes.fromhex(hex_str)
-        return [int.from_bytes(data[i * 4 : i * 4 + 4], "little") for i in range(4)]
+        return [int.from_bytes(data[i * 4:i * 4 + 4], "little") for i in range(4)]
 
     @staticmethod
-    def words_to_hex_le(words):
-        """Serialize four 32-bit little-endian words back to a hex string."""
-        return "".join((w & 0xFFFFFFFF).to_bytes(4, "little").hex() for w in words)
+    def words_to_bytes_le(words: List[int]) -> bytes:
+        """Serialize 32-bit little-endian words back to bytes."""
+        return b"".join((w & 0xFFFFFFFF).to_bytes(4, "little") for w in words)
 
-    def encrypt_block(self, plt):
-        """Encrypt one 128-bit block given as 32 hex characters."""
-        x = self.hex_to_words_le(plt)
+    def encrypt_block(self, plaintext: bytes) -> bytes:
+        """Encrypt one 128-bit block given as 16 bytes."""
+        x = self.bytes_to_words_le(plaintext)
         for i in range(4):
             x[i] = x[i] ^ self.subkeys[i]
         for i in range(16):
@@ -321,11 +324,11 @@ class Twofish(EncryptionBase):
 
         for i in range(4):
             x[i] = x[i] ^ self.subkeys[4 + i]
-        return self.words_to_hex_le(x)
+        return self.words_to_bytes_le(x)
 
-    def decrypt_block(self, plt):
-        """Decrypt one 128-bit block given as 32 hex characters."""
-        x = self.hex_to_words_le(plt)
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
+        """Decrypt one 128-bit block given as 16 bytes."""
+        x = self.bytes_to_words_le(ciphertext)
         for i in range(4):
             x[i] = x[i] ^ self.subkeys[4 + i]
         for i in range(16):
@@ -348,12 +351,4 @@ class Twofish(EncryptionBase):
         x = [x[2], x[3], x[0], x[1]]
         for i in range(4):
             x[i] = x[i] ^ self.subkeys[i]
-        return self.words_to_hex_le(x)
-
-    def encrypt(self, plaintext, mode="ECB", padding="ISO 7816-4", iv=""):
-        """Encrypt a plaintext hex string in the requested mode and padding."""
-        return self.encrypt_mode(32, plaintext, mode, padding, iv)
-
-    def decrypt(self, plaintext, mode="CBC", padding="ISO 7816-4", iv=""):
-        """Decrypt a ciphertext hex string in the requested mode and padding."""
-        return self.decrypt_mode(32, plaintext, mode, padding, iv)
+        return self.words_to_bytes_le(x)

@@ -1,5 +1,7 @@
 """Blowfish (Schneier 1994), implemented step by step for teaching."""
 
+from typing import Union
+
 from encryption_base import EncryptionBase
 
 # Blowfish initial P-array -- the hexadecimal digits of pi
@@ -1068,70 +1070,68 @@ SBOXES = [
 
 
 class Blowfish(EncryptionBase):
-    """Blowfish cipher; 64-bit blocks with variable-length keys."""
+    """Blowfish cipher; 64-bit blocks with variable-length keys (1-56 bytes)."""
+
     def __init__(self):
         """Start with empty per-instance S-box and key-schedule state."""
-        self.sboxes = []
-        self.subkeys = []
+        self.sboxes: list[list[int]] = []
+        self.subkeys: list[int] = []
 
+    def get_block_size(self) -> int:
+        return 8  # 64 bits = 8 bytes
 
-    def generate_keys(self, key):
+    def generate_keys(self, key: Union[bytes, str]) -> None:
         """Build the key schedule: key-XOR the P-array, then re-encrypt P and the S-boxes.
 
         Blowfish accepts keys of 1 to 56 bytes; shorter keys are used as-is and
         the key bytes are cycled when filling the 18 32-bit P-array words.
         """
-        if len(key) % 2 != 0:
-            key = self.pad(key, len(key) + 1, "0")
-        key = self.hex_to_bin(key)
-        key_bytes = len(key) // 8
-        if key_bytes < 1 or key_bytes > 56:
+        if isinstance(key, str):
+            key = self.hex_to_bytes(key)
+        if len(key) < 1 or len(key) > 56:
             raise ValueError("Blowfish key must be 1 to 56 bytes")
 
         keys = []
+        bit_len = len(key) * 8
         index = 0
         for i in range(18):
             word = 0
             for _ in range(32):
-                word = (word << 1) | (1 if key[index % len(key)] == "1" else 0)
+                idx = index % bit_len
+                bit = (key[idx // 8] >> (7 - (idx % 8))) & 1
+                word = (word << 1) | bit
                 index += 1
             keys.append(word ^ PBOX[i])
         self.subkeys = keys
         self.sboxes = [row[:] for row in SBOXES]
-        p = 0
-        for i in range(0, len(self.subkeys), 2):
-            p = int(self.encrypt_block(hex(p)), 16)
-            p1 = int(p / 2**32)
-            p2 = int(p % 2**32)
-            self.subkeys[i] = p1
-            self.subkeys[i + 1] = p2
-            p = p1 * 2**32 + p2
-        for x in range(4):
-            for i in range(0, len(self.sboxes[x]), 2):
-                p = int(self.encrypt_block(hex(p)), 16)
-                p1 = int(p / 2**32)
-                p2 = int(p % 2**32)
-                self.sboxes[x][i] = p1
-                self.sboxes[x][i + 1] = p2
-                p = p1 * 2**32 + p2
 
-    def f(self, x):
+        p = 0
+        for i in range(0, 18, 2):
+            p = self._encrypt_int(p)
+            self.subkeys[i] = p >> 32
+            self.subkeys[i + 1] = p & 0xFFFFFFFF
+        for x in range(4):
+            for i in range(0, 256, 2):
+                p = self._encrypt_int(p)
+                self.sboxes[x][i] = p >> 32
+                self.sboxes[x][i + 1] = p & 0xFFFFFFFF
+
+    def f(self, x: int) -> int:
         """Round function: split a 32-bit word into bytes and combine the four S-box outputs."""
-        quart0 = self.sboxes[0][int(x / 2**24)]
-        quart1 = self.sboxes[1][int(x / 2**16) % 2**8]
-        quart2 = self.sboxes[2][int(x / 2**8) % 2**8]
-        quart3 = self.sboxes[3][int(x % 2**8)]
+        quart0 = self.sboxes[0][(x >> 24) & 0xFF]
+        quart1 = self.sboxes[1][(x >> 16) & 0xFF]
+        quart2 = self.sboxes[2][(x >> 8) & 0xFF]
+        quart3 = self.sboxes[3][x & 0xFF]
 
         result = (quart0 + quart1) % (2**32)
         result = result ^ quart2
         result = (result + quart3) % (2**32)
         return result
 
-    def encrypt_block(self, plt):
-        """Encrypt one 64-bit block given as 16 hex characters."""
-        plt = int(plt, 16)
-        left = plt >> 32
-        right = plt & 0xFFFFFFFF
+    def _encrypt_int(self, block: int) -> int:
+        """Encrypt one 64-bit block given as an integer."""
+        left = block >> 32
+        right = block & 0xFFFFFFFF
 
         for i in range(16):
             left = left ^ self.subkeys[i]
@@ -1142,31 +1142,30 @@ class Blowfish(EncryptionBase):
 
         new_right = left ^ self.subkeys[16]
         new_left = right ^ self.subkeys[17]
-        return hex(2**32 * new_left + new_right)[2:].zfill(16)
+        return 2**32 * new_left + new_right
 
-    def decrypt_block(self, plt):
-        """Decrypt one 64-bit block given as 16 hex characters."""
-        plt = int(plt, 16)
-        left = plt >> 32
-        right = plt & 0xFFFFFFFF
+    def _decrypt_int(self, block: int) -> int:
+        """Decrypt one 64-bit block given as an integer."""
+        left = block >> 32
+        right = block & 0xFFFFFFFF
 
         for i in range(16):
             left = left ^ self.subkeys[17 - i]
             new_right = left
             new_left = self.f(left) ^ right
-
             left = new_left
             right = new_right
 
         new_right = left ^ self.subkeys[1]
         new_left = right ^ self.subkeys[0]
+        return 2**32 * new_left + new_right
 
-        return hex(2**32 * new_left + new_right)[2:].zfill(16)
+    def encrypt_block(self, plaintext: bytes) -> bytes:
+        """Encrypt one 64-bit block given as 8 bytes."""
+        block = int.from_bytes(plaintext[:8], "big")
+        return self._encrypt_int(block).to_bytes(8, "big")
 
-    def encrypt(self, plt, mode="CBC", padding="bit", iv=""):
-        """Encrypt a plaintext hex string in the requested mode and padding."""
-        return self.encrypt_mode(16, plt, mode, padding, iv)
-
-    def decrypt(self, plt, mode="CBC", padding="bit", iv=""):
-        """Decrypt a ciphertext hex string in the requested mode and padding."""
-        return self.decrypt_mode(16, plt, mode, padding, iv)
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
+        """Decrypt one 64-bit block given as 8 bytes."""
+        block = int.from_bytes(ciphertext[:8], "big")
+        return self._decrypt_int(block).to_bytes(8, "big")

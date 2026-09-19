@@ -1,6 +1,7 @@
 """DES and 3DES (FIPS 46-3), implemented step by step for teaching."""
 
 from encryption_base import EncryptionBase
+from typing import Union
 
 # Initial permutation IP (FIPS 46-3, Section 3.2.1): scatters the
 # 64-bit block into left/right halves. Used by encrypt/decrypt_block.
@@ -102,79 +103,95 @@ P = [
     2, 8, 24, 14, 32, 27, 3, 9, 19, 13, 30, 6, 22, 11, 4, 25,
 ]
 
+
+def bits_to_int(bits: str) -> int:
+    """Convert binary string to integer."""
+    return int(bits, 2)
+
+
+def int_to_bits(val: int, length: int) -> str:
+    """Convert integer to binary string of given length."""
+    return format(val, f'0{length}b')
+
+
 class DES(EncryptionBase):
     """DES cipher; 64-bit blocks with 16 hex-character keys."""
 
     def __init__(self):
-        self.subkeys = []
+        self.subkeys: list[int] = []
 
-    def generate_keys(self, key):
-        """Derive the 16 round subkeys from a 64-bit (16 hex char) key."""
-        if len(key) < 16:
-            key = self.pad(key, 16, "0")
-        key = self.hex_to_bin(key)
-        key = [key[i - 1] for i in PC1]
-        left_key = key[0:28]
-        right_key = key[28:56]
+    def get_block_size(self) -> int:
+        return 8  # 64 bits = 8 bytes
+
+    def generate_keys(self, key: Union[bytes, str]) -> None:
+        """Derive the 16 round subkeys from a 64-bit (8 byte) key."""
+        if isinstance(key, str):
+            key = self.hex_to_bytes(key)
+        if len(key) < 8:
+            key = self.pad(key, 8, "0")
+        key_bits = self.bytes_to_bin(key)
+        key_bits = self.permutate_bin(key_bits, PC1)
+        left_key = key_bits[0:28]
+        right_key = key_bits[28:56]
         subkeys = []
         for i in range(16):
             if i + 1 in (1, 2, 9, 16):
                 shift = 1
             else:
                 shift = 2
-            left_key = self.rotl(left_key, shift)
-            right_key = self.rotl(right_key, shift)
-            subkeys.append(int(self.permutate(left_key + right_key, PC2), 2))
+            left_key = self.rotl_str(left_key, shift)
+            right_key = self.rotl_str(right_key, shift)
+            combined = left_key + right_key
+            subkey_bits = self.permutate_bin(combined, PC2)
+            subkeys.append(bits_to_int(subkey_bits))
         self.subkeys = subkeys
 
-    def f(self, blk, subkey):
+    def f(self, blk_bits: str, subkey: int) -> str:
         """Feistel round function: expansion, key XOR, S-boxes, then the P permutation."""
-        expanded = self.permutate(blk, E)
-        mixed = bin(int(expanded, 2) ^ subkey)[2:].zfill(48)
+        expanded = self.permutate_bin(blk_bits, E)
+        expanded_int = bits_to_int(expanded)
+        mixed = expanded_int ^ subkey
+        mixed_bits = int_to_bits(mixed, 48)
         sbox_out = ""
         for j in range(8):
-            six = mixed[j * 6:j * 6 + 6]
+            six = mixed_bits[j * 6:j * 6 + 6]
             row = int(six[0] + six[5], 2)
             col = int(six[1:5], 2)
-            sbox_out += bin(SBOXES[j][row][col])[2:].zfill(4)
-        return "".join(sbox_out[i - 1] for i in P)
+            sbox_out += format(SBOXES[j][row][col], '04b')
+        return self.permutate_bin(sbox_out, P)
 
-    def encrypt_block(self, plt):
-        """Encrypt one 64-bit block given as 16 hex characters."""
-        plt = self.hex_to_bin(plt)
-        plt = "".join([plt[i - 1] for i in IP])
-        left = plt[0:32]
-        right = plt[32:64]
+    def encrypt_block(self, plaintext: bytes) -> bytes:
+        """Encrypt one 64-bit block given as 8 bytes."""
+        blk_bits = self.bytes_to_bin(plaintext)
+        blk_bits = self.permutate_bin(blk_bits, IP)
+        left = blk_bits[0:32]
+        right = blk_bits[32:64]
         for i in range(16):
             new_left = right
             right = self.f(right, self.subkeys[i])
-            new_right = bin(int(left, 2) ^ int(right, 2))[2:].zfill(32)
+            new_right = int_to_bits(int(left, 2) ^ int(right, 2), 32)
             left = new_left
             right = new_right
-        x = right + left
-        return self.bin_to_hex("".join([x[i - 1] for i in FP]))
+        combined = right + left
+        result_bits = self.permutate_bin(combined, FP)
+        return self.bin_to_bytes(result_bits)
 
-    def decrypt_block(self, plt):
-        """Decrypt one 64-bit block given as 16 hex characters."""
-        plt = self.hex_to_bin(plt)
-        plt = self.permutate(plt, IP)
-        left = plt[0:32]
-        right = plt[32:64]
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
+        """Decrypt one 64-bit block given as 8 bytes."""
+        blk_bits = self.bytes_to_bin(ciphertext)
+        blk_bits = self.permutate_bin(blk_bits, IP)
+        left = blk_bits[0:32]
+        right = blk_bits[32:64]
         for i in range(16):
             new_left = right
             right = self.f(right, self.subkeys[15 - i])
-            new_right = bin(int(left, 2) ^ int(right, 2))[2:].zfill(32)
+            new_right = int_to_bits(int(left, 2) ^ int(right, 2), 32)
             left = new_left
             right = new_right
-        return self.bin_to_hex(self.permutate(right + left, FP))
+        combined = right + left
+        result_bits = self.permutate_bin(combined, FP)
+        return self.bin_to_bytes(result_bits)
 
-    def encrypt(self, plt, mode="CBC", padding="bit", iv=""):
-        """Encrypt a plaintext hex string in the requested mode and padding."""
-        return self.encrypt_mode(16, plt, mode, padding, iv)
-
-    def decrypt(self, plt, mode="CBC", padding="bit", iv=""):
-        """Decrypt a ciphertext hex string in the requested mode and padding."""
-        return self.decrypt_mode(16, plt, mode, padding, iv)
 
 class TrippleDES(EncryptionBase):
     """Three-key triple DES: Encrypt-Decrypt-Encrypt over three DES instances."""
@@ -184,28 +201,27 @@ class TrippleDES(EncryptionBase):
         self.des2 = DES()
         self.des3 = DES()
 
-    def encrypt_block(self, plt):
-        """Encrypt one 64-bit block given as 16 hex characters."""
-        plt = self.des1.encrypt_block(plt)
-        plt = self.des2.decrypt_block(plt)
-        return self.des3.encrypt_block(plt)
+    def get_block_size(self) -> int:
+        return 8  # 64 bits = 8 bytes
 
-    def decrypt_block(self, plt):
-        """Decrypt one 64-bit block given as 16 hex characters."""
-        plt = self.des3.decrypt_block(plt)
-        plt = self.des2.encrypt_block(plt)
-        return self.des1.decrypt_block(plt)
+    def encrypt_block(self, plaintext: bytes) -> bytes:
+        """Encrypt one 64-bit block given as 8 bytes."""
+        pt = self.des1.encrypt_block(plaintext)
+        pt = self.des2.decrypt_block(pt)
+        return self.des3.encrypt_block(pt)
 
-    def generate_keys(self, key):
-        """Derive the 16 round subkeys from a 64-bit (16 hex char) key."""
-        self.des1.generate_keys(key[0:16])
-        self.des2.generate_keys(key[16:32])
-        self.des3.generate_keys(key[32:48])
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
+        """Decrypt one 64-bit block given as 8 bytes."""
+        pt = self.des3.decrypt_block(ciphertext)
+        pt = self.des2.encrypt_block(pt)
+        return self.des1.decrypt_block(pt)
 
-    def encrypt(self, plt, mode="CBC", padding="bit", iv=""):
-        """Encrypt a plaintext hex string in the requested mode and padding."""
-        return self.encrypt_mode(16, plt, mode, padding, iv)
-
-    def decrypt(self, plt, mode="CBC", padding="bit", iv=""):
-        """Decrypt a ciphertext hex string in the requested mode and padding."""
-        return self.decrypt_mode(16, plt, mode, padding, iv)
+    def generate_keys(self, key: Union[bytes, str]) -> None:
+        """Derive the 16 round subkeys from a 192-bit (24 byte) key."""
+        if isinstance(key, str):
+            key = self.hex_to_bytes(key)
+        if len(key) < 24:
+            key = self.pad(key, 24, "0")
+        self.des1.generate_keys(key[0:8])
+        self.des2.generate_keys(key[8:16])
+        self.des3.generate_keys(key[16:24])

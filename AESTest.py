@@ -68,9 +68,10 @@ def run_single_block(kats, label):
     for name, key, pt, ct in kats:
         c = AES()
         c.generate_keys(key)
-        got = c.encrypt_block(pt)
-        check("%s %s encrypt" % (label, name.lower()), got, ct)
-        check("%s %s decrypt" % (label, name.lower()), c.decrypt_block(got), pt)
+        got = c.encrypt_block(bytes.fromhex(pt))
+        check("%s %s encrypt" % (label, name.lower()), got.hex(), ct)
+        check("%s %s decrypt" % (label, name.lower()),
+              c.decrypt_block(got).hex(), pt)
 
 
 def run_mode_kats(kats, mode, label):

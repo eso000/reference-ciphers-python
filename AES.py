@@ -50,18 +50,16 @@ AES_ROUNDS = {4: 11, 6: 13, 8: 15}
 XTIME_REDUCTION = 0x11B
 
 
-def xtime(a):
+def xtime(a: int) -> int:
     """Multiply byte a by 0x02 in GF(2^8); the building block of MixColumns."""
-
     a <<= 1
     if a & 0x100:
         a ^= XTIME_REDUCTION
     return a & 0xFF
 
 
-def gmul(a, b):
+def gmul(a: int, b: int) -> int:
     """Multiply two bytes in GF(2^8) the Russian-peasant / xtime way."""
-
     out = 0
     while b:
         if b & 1:
@@ -75,130 +73,134 @@ class AES(EncryptionBase):
     """AES cipher; supports 128/192/256-bit keys and 128-bit blocks."""
 
     def __init__(self):
-        self.subkeys = []
+        self.subkeys: list[list[int]] = []
 
-    def sub_bytes(self, s):
+    def get_block_size(self) -> int:
+        return 16  # 128 bits = 16 bytes
+
+    def sub_bytes(self, state: list[int]) -> list[int]:
         """Substitute each state byte through the AES S-box (FIPS-197 5.1.1)."""
-        return [SBOX[int(x / 16)][int(x % 16)] for x in s]
+        return [SBOX[b >> 4][b & 0xF] for b in state]
 
-    def inv_sub_bytes(self, s):
+    def inv_sub_bytes(self, state: list[int]) -> list[int]:
         """Inverse S-box substitution (FIPS-197 5.1.2)."""
-        return [INV_SBOX[int(x / 16)][int(x % 16)] for x in s]
+        return [INV_SBOX[b >> 4][b & 0xF] for b in state]
 
-    def add_round_key(self, arr1, arr2):
+    def add_round_key(self, state: list[int], round_key: list[int]) -> list[int]:
         """XOR the state with a 16-byte round key."""
-        return [arr1[i] ^ arr2[i] for i in range(len(arr1))]
+        return [state[i] ^ round_key[i] for i in range(16)]
 
-    def generate_keys(self, key):
-        """Expand a 128/192/256-bit hex key into the round-key schedule."""
-        key = self.pad_key_hex(key, [32, 48, 64])
-        keys = []
-        s = bytes.fromhex(key)
+    def generate_keys(self, key: Union[bytes, str]) -> None:
+        """Expand a 128/192/256-bit key into the round-key schedule."""
+        if isinstance(key, str):
+            key = self.hex_to_bytes(key)
+        key = self.pad_key_hex(key.hex(), [32, 48, 64])
+        key_bytes = self.hex_to_bytes(key)
+        n_words = len(key_bytes) // 4
+        rounds = AES_ROUNDS[n_words]
+
         w = []
-        for x in range(0, len(s), 4):
-            w.append([s[x], s[x + 1], s[x + 2], s[x + 3]])
-        n = len(w)
-        rounds = AES_ROUNDS[n]
+        for i in range(0, len(key_bytes), 4):
+            w.append(list(key_bytes[i:i+4]))
+
         rcon = [1, 0, 0, 0]
-        for x in range(n, 4 * rounds):
-            if x % n == 0:
-                if x - n > 0:
+        for i in range(n_words, 4 * rounds):
+            temp = w[-1].copy()
+            if i % n_words == 0:
+                if i > n_words:
                     rcon[0] = xtime(rcon[0])
-                t = self.add_round_key(self.sub_bytes(self.rotl(w[len(w) - 1], 1)), rcon)
-                w.append(self.add_round_key(w[len(w) - n], t))
-            elif n > 6 and x % n == 4:
-                w.append(self.add_round_key(w[len(w) - n], self.sub_bytes(w[len(w) - 1])))
-            else:
-                w.append(self.add_round_key(w[len(w) - n], w[len(w) - 1]))
+                # RotWord
+                temp = temp[1:] + temp[:1]
+                # SubWord
+                temp = [SBOX[b >> 4][b & 0xF] for b in temp]
+                # Rcon
+                temp[0] ^= rcon[0]
+            elif n_words > 6 and i % n_words == 4:
+                # SubWord for 256-bit keys
+                temp = [SBOX[b >> 4][b & 0xF] for b in temp]
+            w.append([w[i - n_words][j] ^ temp[j] for j in range(4)])
+
+        # Convert to list of 16-byte round keys
+        self.subkeys = []
         for i in range(0, len(w), 4):
-            keys.append(w[i] + w[i + 1] + w[i + 2] + w[i + 3])
-        self.subkeys = keys
+            round_key = w[i] + w[i+1] + w[i+2] + w[i+3]
+            self.subkeys.append(round_key)
 
-    def inv_shift_rows(self, s):
-        """Inverse of shift_rows, used by decryption."""
-        for i in range(1, 4):
-            row = [s[i], s[i + 4], s[i + 8], s[i + 12]]
-            row = self.rotl(row, 4 - i)
-            s[i] = row[0]
-            s[i + 4] = row[1]
-            s[i + 8] = row[2]
-            s[i + 12] = row[3]
-        return s
-
-    def shift_rows(self, s):
+    def shift_rows(self, state: list[int]) -> list[int]:
         """Cyclically rotate each state row left by its row index."""
-        for i in range(1, 4):
-            row = [s[i], s[i + 4], s[i + 8], s[i + 12]]
-            row = self.rotl(row, i)
-            s[i] = row[0]
-            s[i + 4] = row[1]
-            s[i + 8] = row[2]
-            s[i + 12] = row[3]
-        return s
+        # State is column-major: [c0r0, c1r0, c2r0, c3r0, c0r1, ...]
+        # Row 0: no shift
+        # Row 1: shift left 1
+        # Row 2: shift left 2
+        # Row 3: shift left 3
+        return [
+            state[0], state[5], state[10], state[15],  # row 0
+            state[4], state[9], state[14], state[3],   # row 1
+            state[8], state[13], state[2], state[7],   # row 2
+            state[12], state[1], state[6], state[11],  # row 3
+        ]
 
-    def mix_rows(self, s):
+    def inv_shift_rows(self, state: list[int]) -> list[int]:
+        """Inverse of shift_rows, used by decryption."""
+        return [
+            state[0], state[13], state[10], state[7],   # row 0
+            state[4], state[1], state[14], state[11],   # row 1
+            state[8], state[5], state[2], state[15],    # row 2
+            state[12], state[9], state[6], state[3],    # row 3
+        ]
+
+    def mix_columns(self, state: list[int]) -> list[int]:
         """Mix each state column with the circulant matrix over GF(2^8)."""
-        m = [[2, 3, 1, 1], [1, 2, 3, 1], [1, 1, 2, 3], [3, 1, 1, 2]]
-        return [
-            gmul(m[i][0], s[4 * x])
-            ^ gmul(m[i][1], s[1 + 4 * x])
-            ^ gmul(m[i][2], s[2 + 4 * x])
-            ^ gmul(m[i][3], s[3 + 4 * x])
-            for x in range(4)
-            for i in range(4)
-        ]
+        out = [0] * 16
+        for c in range(4):
+            s0 = state[c*4]
+            s1 = state[c*4 + 1]
+            s2 = state[c*4 + 2]
+            s3 = state[c*4 + 3]
+            out[c*4] = gmul(2, s0) ^ gmul(3, s1) ^ s2 ^ s3
+            out[c*4 + 1] = s0 ^ gmul(2, s1) ^ gmul(3, s2) ^ s3
+            out[c*4 + 2] = s0 ^ s1 ^ gmul(2, s2) ^ gmul(3, s3)
+            out[c*4 + 3] = gmul(3, s0) ^ s1 ^ s2 ^ gmul(2, s3)
+        return out
 
-    def inv_mix_rows(self, s):
-        """Inverse of mix_rows, used by decryption."""
-        m = [[14, 11, 13, 9], [9, 14, 11, 13], [13, 9, 14, 11], [11, 13, 9, 14]]
-        return [
-            gmul(m[i][0], s[4 * x])
-            ^ gmul(m[i][1], s[1 + 4 * x])
-            ^ gmul(m[i][2], s[2 + 4 * x])
-            ^ gmul(m[i][3], s[3 + 4 * x])
-            for x in range(4)
-            for i in range(4)
-        ]
+    def inv_mix_columns(self, state: list[int]) -> list[int]:
+        """Inverse of mix_columns, used by decryption."""
+        out = [0] * 16
+        for c in range(4):
+            s0 = state[c*4]
+            s1 = state[c*4 + 1]
+            s2 = state[c*4 + 2]
+            s3 = state[c*4 + 3]
+            out[c*4] = gmul(14, s0) ^ gmul(11, s1) ^ gmul(13, s2) ^ gmul(9, s3)
+            out[c*4 + 1] = gmul(9, s0) ^ gmul(14, s1) ^ gmul(11, s2) ^ gmul(13, s3)
+            out[c*4 + 2] = gmul(13, s0) ^ gmul(9, s1) ^ gmul(14, s2) ^ gmul(11, s3)
+            out[c*4 + 3] = gmul(11, s0) ^ gmul(13, s1) ^ gmul(9, s2) ^ gmul(14, s3)
+        return out
 
-    def encrypt_block(self, plt):
-        """Encrypt one 128-bit block given as 32 hex characters."""
-        plt = bytes.fromhex(plt)
-        plt = self.add_round_key(plt, self.subkeys[0])
-        for x in range(1, len(self.subkeys) - 1):
-            plt = self.sub_bytes(plt)
-            plt = self.shift_rows(plt)
-            plt = self.mix_rows(plt)
-            plt = self.add_round_key(plt, self.subkeys[x])
-        plt = self.sub_bytes(plt)
-        plt = self.shift_rows(plt)
-        plt = self.add_round_key(plt, self.subkeys[-1])
-        s = ""
-        for x in plt:
-            s = s + hex(x)[2:].zfill(2)
-        return s
+    def encrypt_block(self, plaintext: bytes) -> bytes:
+        """Encrypt one 128-bit block given as 16 bytes."""
+        state = list(plaintext)
+        state = self.add_round_key(state, self.subkeys[0])
+        for round_key in self.subkeys[1:-1]:
+            state = self.sub_bytes(state)
+            state = self.shift_rows(state)
+            state = self.mix_columns(state)
+            state = self.add_round_key(state, round_key)
+        state = self.sub_bytes(state)
+        state = self.shift_rows(state)
+        state = self.add_round_key(state, self.subkeys[-1])
+        return bytes(state)
 
-    def decrypt_block(self, plt):
-        """Decrypt one 128-bit block given as 32 hex characters."""
-        plt = bytes.fromhex(plt)
-        l = len(self.subkeys)
-        plt = self.add_round_key(plt, self.subkeys[l - 1])
-        plt = self.inv_shift_rows(plt)
-        plt = self.inv_sub_bytes(plt)
-        for x in range(2, l):
-            plt = self.add_round_key(plt, self.subkeys[l - x])
-            plt = self.inv_mix_rows(plt)
-            plt = self.inv_shift_rows(plt)
-            plt = self.inv_sub_bytes(plt)
-        plt = self.add_round_key(plt, self.subkeys[0])
-        s = ""
-        for x in plt:
-            s = s + hex(x)[2:].zfill(2)
-        return s
-
-    def encrypt(self, plaintext, mode="CBC", padding="ISO 7816-4", iv=""):
-        """Encrypt a plaintext hex string in the requested mode and padding."""
-        return self.encrypt_mode(32, plaintext, mode, padding, iv)
-
-    def decrypt(self, plaintext, mode="CBC", padding="ISO 7816-4", iv=""):
-        """Decrypt a ciphertext hex string in the requested mode and padding."""
-        return self.decrypt_mode(32, plaintext, mode, padding, iv)
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
+        """Decrypt one 128-bit block given as 16 bytes."""
+        state = list(ciphertext)
+        state = self.add_round_key(state, self.subkeys[-1])
+        state = self.inv_shift_rows(state)
+        state = self.inv_sub_bytes(state)
+        for round_key in reversed(self.subkeys[1:-1]):
+            state = self.add_round_key(state, round_key)
+            state = self.inv_mix_columns(state)
+            state = self.inv_shift_rows(state)
+            state = self.inv_sub_bytes(state)
+        state = self.add_round_key(state, self.subkeys[0])
+        return bytes(state)

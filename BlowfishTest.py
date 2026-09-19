@@ -91,9 +91,9 @@ def run_official():
         name = "official ecb %02d" % (i + 1)
         c = Blowfish()
         c.generate_keys(key)
-        got = c.encrypt_block(pt)
-        check(name + " encrypt", got, ct)
-        check(name + " decrypt", c.decrypt_block(got), pt)
+        got = c.encrypt_block(bytes.fromhex(pt))
+        check(name + " encrypt", got.hex(), ct)
+        check(name + " decrypt", c.decrypt_block(got).hex(), pt)
 
 
 def run_set_key():
@@ -101,7 +101,7 @@ def run_set_key():
         c = Blowfish()
         c.generate_keys(key)
         name = "set_key %d-byte key" % (len(key) // 2)
-        check(name, c.encrypt_block("FEDCBA9876543210"), ct)
+        check(name, c.encrypt_block(bytes.fromhex("FEDCBA9876543210")).hex(), ct)
 
 
 def main():
@@ -114,7 +114,7 @@ def main():
     c = Blowfish()
     c.generate_keys("AABB09182736CCDD")
     check("repo vector: key=AABB09182736CCDD -> c8fdcaea64fa2c82",
-          c.encrypt_block("123456ABCD132536"), "c8fdcaea64fa2c82")
+          c.encrypt_block(bytes.fromhex("123456ABCD132536")).hex(), "c8fdcaea64fa2c82")
 
     print("== ECB multi-block round trip ==")
     c = Blowfish()
@@ -156,10 +156,10 @@ def main():
         c = Blowfish()
         c.generate_keys(key)
         pt = "123456abcd132536"
-        ct = c.encrypt_block(pt)
+        ct = c.encrypt_block(bytes.fromhex(pt)).hex()
         check("%s key: ciphertext differs from plaintext" % label, ct != pt, True)
         check("%s key: encrypt+decrypt restores plaintext" % label,
-              c.decrypt_block(ct), pt)
+              c.decrypt_block(bytes.fromhex(ct)).hex(), pt)
 
     print("== key length validation ==")
     for label, key in (("empty key rejected", ""),

@@ -47,9 +47,9 @@ def main():
         name = "kat %02d" % (i + 1)
         c = Twofish()
         c.generate_keys(key)
-        got = c.encrypt_block(pt)
-        check(name + " encrypt", got, ct)
-        check(name + " decrypt", c.decrypt_block(got), pt)
+        got = c.encrypt_block(bytes.fromhex(pt))
+        check(name + " encrypt", got.hex(), ct)
+        check(name + " decrypt", c.decrypt_block(got).hex(), pt)
 
     print("== ECB multi-block round trip (all key sizes) ==")
     for label, key in KEYS:
