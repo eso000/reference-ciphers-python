@@ -1076,17 +1076,26 @@ class Blowfish(EncryptionBase):
 
 
     def generate_keys(self, key):
-        """Build the key schedule: key-XOR the P-array, then re-encrypt P and the S-boxes."""
-        if key == "":
-            key = "0"
-        if len(key) % 8 != 0:
-            key = self.pad(key, 8 * (int(len(key) / 8) + 1), "0")
+        """Build the key schedule: key-XOR the P-array, then re-encrypt P and the S-boxes.
+
+        Blowfish accepts keys of 1 to 56 bytes; shorter keys are used as-is and
+        the key bytes are cycled when filling the 18 32-bit P-array words.
+        """
+        if len(key) % 2 != 0:
+            key = self.pad(key, len(key) + 1, "0")
         key = self.hex_to_bin(key)
+        key_bytes = len(key) // 8
+        if key_bytes < 1 or key_bytes > 56:
+            raise ValueError("Blowfish key must be 1 to 56 bytes")
 
         keys = []
+        index = 0
         for i in range(18):
-            t = (32 * i) % len(key)
-            keys.append(int(key[t : t + 32], 2) ^ PBOX[i])
+            word = 0
+            for _ in range(32):
+                word = (word << 1) | (1 if key[index % len(key)] == "1" else 0)
+                index += 1
+            keys.append(word ^ PBOX[i])
         self.subkeys = keys
         self.sboxes = [row[:] for row in SBOXES]
         p = 0
@@ -1121,8 +1130,8 @@ class Blowfish(EncryptionBase):
     def encrypt_block(self, plt):
         """Encrypt one 64-bit block given as 16 hex characters."""
         plt = int(plt, 16)
-        left = int(plt / 2**32)
-        right = int(plt % 2**32)
+        left = plt >> 32
+        right = plt & 0xFFFFFFFF
 
         for i in range(16):
             left = left ^ self.subkeys[i]
@@ -1138,8 +1147,8 @@ class Blowfish(EncryptionBase):
     def decrypt_block(self, plt):
         """Decrypt one 64-bit block given as 16 hex characters."""
         plt = int(plt, 16)
-        left = int(plt / 2**32)
-        right = int(plt % 2**32)
+        left = plt >> 32
+        right = plt & 0xFFFFFFFF
 
         for i in range(16):
             left = left ^ self.subkeys[17 - i]
