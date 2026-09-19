@@ -1,382 +1,298 @@
 """Shared conversion and padding helpers for the teaching ciphers."""
 
+from typing import List, Union
+
 
 class EncryptionBase:
-    """Base class supplying string/binary/hex conversions, XOR, rotation,
+    """Base class supplying bytes/hex conversions, XOR, rotation,
     bit permutation, and block-mode scaffolding shared by the ciphers."""
 
-    def string_to_bin(self, s):
-        """Encode each character as an 8-bit binary string."""
-        return "".join([bin(ord(x))[2:].zfill(8) for x in s])
-
-    def bin_to_string(self, s):
-        """Decode 8-bit chunks back to characters, skipping byte values 0-239."""
-        result = ""
-        while len(s) != 0:
-            if int(s[0:8], 2) > 0 and int(s[0:8], 2) < 240:
-                result = result + chr(int(s[0:8], 2))
-            s = s[8:]
-        return result
-
-    def string_to_hex(self, s):
-        """Encode each character as its two-hex-digit code."""
-        result = ""
-        for x in s:
-            result = result + hex(ord(x))[2:].zfill(2)
-        return result
+    @staticmethod
+    def bytes_to_hex(data: bytes) -> str:
+        """Encode bytes as hex string."""
+        return data.hex()
 
     @staticmethod
-    def hex_to_bin(s):
+    def hex_to_bytes(hex_str: str) -> bytes:
+        """Decode hex string to bytes."""
+        return bytes.fromhex(hex_str)
+
+    @staticmethod
+    def bytes_to_bin(data: bytes) -> str:
+        """Encode bytes as binary string (8 bits per byte)."""
+        return "".join(f"{b:08b}" for b in data)
+
+    @staticmethod
+    def bin_to_bytes(bin_str: str) -> bytes:
+        """Decode binary string (8 bits per byte) to bytes."""
+        if len(bin_str) % 8 != 0:
+            raise ValueError("Binary string length must be multiple of 8")
+        return bytes(int(bin_str[i:i+8], 2) for i in range(0, len(bin_str), 8))
+
+    @staticmethod
+    def hex_to_bin(hex_str: str) -> str:
         """Expand a hex string into its binary representation."""
         mp = {
-            "0": "0000",
-            "1": "0001",
-            "2": "0010",
-            "3": "0011",
-            "4": "0100",
-            "5": "0101",
-            "6": "0110",
-            "7": "0111",
-            "8": "1000",
-            "9": "1001",
-            "A": "1010",
-            "B": "1011",
-            "C": "1100",
-            "D": "1101",
-            "E": "1110",
-            "F": "1111",
-            "a": "1010",
-            "b": "1011",
-            "c": "1100",
-            "d": "1101",
-            "e": "1110",
-            "f": "1111",
+            "0": "0000", "1": "0001", "2": "0010", "3": "0011",
+            "4": "0100", "5": "0101", "6": "0110", "7": "0111",
+            "8": "1000", "9": "1001", "a": "1010", "b": "1011",
+            "c": "1100", "d": "1101", "e": "1110", "f": "1111",
+            "A": "1010", "B": "1011", "C": "1100", "D": "1101",
+            "E": "1110", "F": "1111",
         }
-        return "".join([mp[si] for si in s])
+        return "".join(mp[ch] for ch in hex_str)
 
     @staticmethod
-    def bin_to_hex(s):
+    def bin_to_hex(bin_str: str) -> str:
         """Group a binary string into nibbles and render them as hex."""
+        if len(bin_str) % 4 != 0:
+            raise ValueError("Binary string length must be multiple of 4")
         mp = {
-            "0000": "0",
-            "0001": "1",
-            "0010": "2",
-            "0011": "3",
-            "0100": "4",
-            "0101": "5",
-            "0110": "6",
-            "0111": "7",
-            "1000": "8",
-            "1001": "9",
-            "1010": "a",
-            "1011": "b",
-            "1100": "c",
-            "1101": "d",
-            "1110": "e",
-            "1111": "f",
+            "0000": "0", "0001": "1", "0010": "2", "0011": "3",
+            "0100": "4", "0101": "5", "0110": "6", "0111": "7",
+            "1000": "8", "1001": "9", "1010": "a", "1011": "b",
+            "1100": "c", "1101": "d", "1110": "e", "1111": "f",
         }
-        return "".join([mp[s[i : i + 4]] for i in range(0, len(s), 4)])
+        return "".join(mp[bin_str[i:i+4]] for i in range(0, len(bin_str), 4))
 
     @staticmethod
-    def bin_to_hex_le(s):
-        """Eight bits -> two hex digits, each nibble reversed (little-endian)."""
-        mp = {
-            "0000": "0",
-            "0001": "1",
-            "0010": "2",
-            "0011": "3",
-            "0100": "4",
-            "0101": "5",
-            "0110": "6",
-            "0111": "7",
-            "1000": "8",
-            "1001": "9",
-            "1010": "a",
-            "1011": "b",
-            "1100": "c",
-            "1101": "d",
-            "1110": "e",
-            "1111": "f",
-        }
-        return "".join(
-            [
-                mp[s[i + 4 : i + 8][::-1]] + mp[s[i : i + 4][::-1]]
-                for i in range(0, len(s), 8)
-            ]
-        )
+    def bitwise_xor_bytes(data1: bytes, data2: bytes) -> bytes:
+        """XOR two equal-length byte sequences."""
+        min_len = min(len(data1), len(data2))
+        return bytes(data1[i] ^ data2[i] for i in range(min_len))
 
     @staticmethod
-    def hex_to_bin_le(s):
-        """Two hex digits -> eight bits, each nibble reversed (little-endian)."""
-        mp = {
-            "0": "0000",
-            "1": "0001",
-            "2": "0010",
-            "3": "0011",
-            "4": "0100",
-            "5": "0101",
-            "6": "0110",
-            "7": "0111",
-            "8": "1000",
-            "9": "1001",
-            "A": "1010",
-            "B": "1011",
-            "C": "1100",
-            "D": "1101",
-            "E": "1110",
-            "F": "1111",
-            "a": "1010",
-            "b": "1011",
-            "c": "1100",
-            "d": "1101",
-            "e": "1110",
-            "f": "1111",
-        }
-        return "".join(
-            [mp[s[i + 1]][::-1] + mp[s[i]][::-1] for i in range(0, len(s), 2)]
-        )
+    def bitwise_xor_bin(bin_str1: str, bin_str2: str) -> str:
+        """XOR two equal-length binary strings."""
+        min_len = min(len(bin_str1), len(bin_str2))
+        return "".join("0" if bin_str1[i] == bin_str2[i] else "1" for i in range(min_len))
 
     @staticmethod
-    def bitwise_xor(bit_string1, bit_string2):
-        """XOR two equal-length binary strings, character by character."""
-        min_length = min(len(bit_string1), len(bit_string2))
-        result = ""
-        for i in range(min_length):
-            if bit_string1[i] == bit_string2[i]:
-                result += "0"
-            else:
-                result += "1"
-        return result
-
-    @staticmethod
-    def permutate(bit_string, perm, start=1):
+    def permutate_bin(bin_str: str, perm: List[int], start: int = 1) -> str:
         """Pick bits by the 1-based index list ``perm`` from a binary string."""
-        return "".join([bit_string[i - start] for i in perm])
+        return "".join(bin_str[i - start] for i in perm)
 
     @staticmethod
-    def rotl(s, shifts):
-        """Cyclically rotate a string or list left by ``shifts`` positions."""
-        if isinstance(s, str):
-            for _ in range(shifts):
-                s = s[1 : len(s)] + s[0]
-            return s
-        if isinstance(s, list):
-            return s[shifts:] + s[:shifts]
-        raise TypeError(
-            f"rotl expects str or list, got {type(s).__name__}"
-        )
+    def permutate_bytes(data: bytes, perm: List[int], start: int = 1) -> bytes:
+        """Pick bytes by the 1-based index list ``perm`` from bytes."""
+        return bytes(data[i - start] for i in perm)
 
     @staticmethod
-    def rotr(s, shifts):
-        """Cyclically rotate a string or list right by ``shifts`` positions."""
-        if isinstance(s, str):
-            for _ in range(shifts):
-                s = s[len(s) - 1] + s[0 : len(s) - 1]
-            return s
-        if isinstance(s, list):
-            result = []
-            for _ in range(shifts):
-                for j in range(1, len(s)):
-                    result.append(s[j])
-                result.append(s[0])
-                s = result
-                result = []
-            return s
-        raise TypeError(
-            f"rotr expects str or list, got {type(s).__name__}"
-        )
+    def rotl_str(s: str, shifts: int) -> str:
+        """Cyclically rotate a string left by ``shifts`` positions."""
+        shifts %= len(s)
+        return s[shifts:] + s[:shifts]
 
-    def encrypt_block(self, plt):
+    @staticmethod
+    def rotr_str(s: str, shifts: int) -> str:
+        """Cyclically rotate a string right by ``shifts`` positions."""
+        shifts %= len(s)
+        return s[-shifts:] + s[:-shifts]
+
+    @staticmethod
+    def rotl_list(lst: List, shifts: int) -> List:
+        """Cyclically rotate a list left by ``shifts`` positions."""
+        shifts %= len(lst)
+        return lst[shifts:] + lst[:shifts]
+
+    @staticmethod
+    def rotr_list(lst: List, shifts: int) -> List:
+        """Cyclically rotate a list right by ``shifts`` positions."""
+        shifts %= len(lst)
+        return lst[-shifts:] + lst[:-shifts]
+
+    @staticmethod
+    def shift_left_bin(bin_str: str, n: int) -> str:
+        """Shift a binary string left by ``n`` bits, zero-filling on the right."""
+        return bin_str[n:] + "0" * n
+
+    @staticmethod
+    def shift_right_bin(bin_str: str, n: int) -> str:
+        """Shift a binary string right by ``n`` bits, zero-filling on the left."""
+        return "0" * n + bin_str[:-n]
+
+    def encrypt_block(self, plaintext: bytes) -> bytes:
         """Placeholder: single-block encryption, overridden by each cipher."""
-        return plt
+        return plaintext
 
-    def decrypt_block(self, plt):
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Placeholder: single-block decryption, overridden by each cipher."""
-        return plt
+        return ciphertext
 
-    def pad(self, st, leng, typ="bit"):
-        """Pad a hex string ``st`` up to length ``leng`` (in hex characters)
-        using the requested scheme. Returns it unchanged when already long."""
-        if len(st) == 0:
-            st = "00"
-        if len(st) % 2 == 1:
-            st += "0"
-        shortfall = leng - len(st)
+    def pad(self, data: bytes, length: int, typ: str = "bit") -> bytes:
+        """Pad ``data`` up to ``length`` bytes using the requested scheme.
+        
+        Returns it unchanged when already long enough.
+        """
+        if len(data) == 0:
+            data = b"\x00"
+        shortfall = length - len(data)
         if shortfall <= 0:
-            return st
+            return data
+
         if typ == "bit":
-            st = self.hex_to_bin(st)
-            shortfall = shortfall * 4
-            st = st + "1"
-            for _ in range(1, shortfall):
-                st = st + "0"
-            return self.bin_to_hex(st)
+            # Bit padding: append 0x80 then zeros
+            return data + b"\x80" + b"\x00" * (shortfall - 1)
         if typ == "TBC":
-            st = self.hex_to_bin(st)
-            shortfall = shortfall * 4
-            if st[len(st) - 1] == "1":
-                c = "0"
-            else:
-                c = "1"
-            for _ in range(0, shortfall):
-                st = st + c
-            return self.bin_to_hex(st)
-        if typ == "byt":
-            for _ in range(0, int(shortfall / 2)):
-                st = st + "00"
-            return st
+            # Trailing bit complement - not common, simple implementation
+            last_bit = data[-1] & 1
+            complement = bytes([last_bit ^ 1]) * shortfall
+            return data + complement
+        if typ == "byt" or typ == "0":
+            # Zero padding
+            return data + b"\x00" * shortfall
         if typ == "ISO 7816-4":
-            st = st + "80"
-            for _ in range(1, int(shortfall / 2)):
-                st = st + "00"
-            return st
+            # ISO 7816-4: append 0x80 then zeros
+            return data + b"\x80" + b"\x00" * (shortfall - 1)
         if typ == "PKCS":
-            count = int(shortfall / 2)
-            c = hex(count)[2:].zfill(2)
-            for _ in range(count):
-                st = st + c
-            return st
+            # PKCS#7: pad with byte value = padding length
+            pad_byte = shortfall
+            return data + bytes([pad_byte]) * shortfall
         if typ == "ANSI X9.23":
-            count = int(shortfall / 2)
-            c = hex(count)[2:].zfill(2)
-            for _ in range(count - 1):
-                st = st + "00"
-            st = st + c
-            return st
-        if typ == "0":
-            for _ in range(0, int(shortfall)):
-                st = st + "0"
-            return st
+            # ANSI X9.23: zeros then padding length
+            return data + b"\x00" * (shortfall - 1) + bytes([shortfall])
         raise ValueError(f"Unknown padding type '{typ}'")
 
-    def unpad(self, st, leng, typ="bit"):
-        """Remove the padding added by :meth:`pad` from a hex string.
-
-        Returns ``st`` unchanged when the trailing bytes do not form a valid
+    def unpad(self, data: bytes, length: int, typ: str = "bit") -> bytes:
+        """Remove the padding added by :meth:`pad` from ``data``.
+        
+        Returns ``data`` unchanged when the trailing bytes do not form a valid
         pad for ``typ``. Zero and character padding are ambiguous and left
-        untouched, mirroring the C/C++ reference implementations.
+        untouched.
         """
         if typ in ("", "0", "byt", "None"):
-            return st
+            return data
+        if len(data) == 0:
+            return data
+
         if typ == "PKCS":
-            if len(st) < 2:
-                return st
-            count = st[-2:]
-            n = int(count, 16)
-            if n < 1 or n * 2 > len(st) or n * 2 > leng:
-                return st
-            if st[-2 * n :].lower() == count.lower() * n:
-                return st[: -2 * n]
-            return st
+            pad_byte = data[-1]
+            if pad_byte < 1 or pad_byte > length or pad_byte > len(data):
+                return data
+            if data[-pad_byte:] == bytes([pad_byte]) * pad_byte:
+                return data[:-pad_byte]
+            return data
         if typ == "ANSI X9.23":
-            if len(st) < 2:
-                return st
-            count = st[-2:]
-            n = int(count, 16)
-            if n < 1 or n * 2 > len(st) or n * 2 > leng:
-                return st
-            if st[-2:].lower() != count.lower():
-                return st
-            if st[-2 * n : -2].lower() == "00" * (n - 1):
-                return st[: -2 * n]
-            return st
+            pad_byte = data[-1]
+            if pad_byte < 1 or pad_byte > length or pad_byte > len(data):
+                return data
+            if data[-pad_byte:-1] == b"\x00" * (pad_byte - 1) and data[-1] == pad_byte:
+                return data[:-pad_byte]
+            return data
         if typ in ("ISO 7816-4", "bit"):
-            limit = max(0, len(st) - leng)
-            i = len(st) - 2
-            while i >= limit and st[i : i + 2] == "00":
-                i -= 2
-            if i >= limit and st[i : i + 2].lower() == "80":
-                return st[:i]
-            return st
+            # Find last 0x80 preceded by zeros
+            for i in range(len(data) - 1, max(-1, len(data) - length - 1), -1):
+                if data[i] == 0x80:
+                    if data[i+1:] == b"\x00" * (len(data) - i - 1):
+                        return data[:i]
+            return data
         if typ == "TBC":
-            bits = self.hex_to_bin(st)
-            if len(bits) == 0:
-                return st
-            limit = max(0, len(bits) - leng * 4)
-            last = bits[-1]
-            i = len(bits) - 1
-            while i >= limit and bits[i] == last:
+            # Trailing bit complement - find where bits stop being complement
+            last_bit = data[-1] & 1
+            i = len(data) - 1
+            while i >= max(0, len(data) - length) and (data[i] & 1) == last_bit:
                 i -= 1
-            stripped = len(bits) - 1 - i
-            if 0 < stripped <= leng * 4 and stripped % 4 == 0:
-                return self.bin_to_hex(bits[: len(bits) - stripped])
-            return st
+            stripped = len(data) - 1 - i
+            if 0 < stripped <= length and stripped % 1 == 0:
+                return data[:len(data) - stripped]
+            return data
         raise ValueError(f"Unknown padding type '{typ}'")
 
-    def pad_key_hex(self, key, sizes):
-        """Pad a hex key to the first allowed ``sizes`` value (in hex
-        characters) that fits it, or truncate it to the largest size."""
+    def pad_key_hex(self, key: str, sizes: List[int]) -> str:
+        """Pad a hex key to the first allowed ``sizes`` value (in hex characters)
+        that fits it, or truncate it to the largest size."""
         for size in sizes:
             if len(key) <= size:
-                return self.pad(key, size, "0")
-        return key[0 : sizes[-1]]
+                return self.pad(bytes.fromhex(key), size // 2, "0").hex()
+        return key[:sizes[-1]]
 
-    @staticmethod
-    def shift_left(bit_string, n):
-        """Shift a binary string left by ``n`` bits, zero-filling on the right."""
-        for _ in range(n):
-            bit_string = bit_string[1 : len(bit_string)] + "0"
-        return bit_string
-
-    @staticmethod
-    def shift_right(bit_string, n):
-        """Shift a binary string right by ``n`` bits, zero-filling on the left."""
-        for _ in range(n):
-            bit_string = "0" + bit_string[0 : len(bit_string) - 1]
-        return bit_string
-
-    def encrypt_mode(self, block_size, plt, mode="CBC", padding="", iv=""):
-        """Split the hex plaintext into blocks and encrypt them in the
-        requested mode (ECB or CBC)."""
+    def encrypt_mode(self, block_size: int, plaintext: bytes, mode: str = "CBC", 
+                     padding: str = "", iv: bytes = b"") -> bytes:
+        """Split the plaintext into blocks and encrypt them in the
+        requested mode (ECB or CBC). Block size is in bytes."""
         blocks = [
-            plt[i : i + block_size] for i in range(0, len(plt), block_size)
+            plaintext[i:i + block_size] for i in range(0, len(plaintext), block_size)
         ]
         if len(blocks) == 0:
-            blocks = [self.pad(plt, block_size, padding)]
+            blocks = [self.pad(plaintext, block_size, padding)]
         elif len(blocks[-1]) < block_size:
-            blocks[len(blocks) - 1] = self.pad(
-                blocks[len(blocks) - 1], block_size, padding
-            )
+            blocks[-1] = self.pad(blocks[-1], block_size, padding)
 
         if mode == "ECB":
-            result = ""
+            result = bytearray()
             for block in blocks:
-                result = result + self.encrypt_block(block)
-            return result
+                result.extend(self.encrypt_block(block))
+            return bytes(result)
         if mode == "CBC":
-            result = ""
+            result = bytearray()
             if len(iv) != block_size:
                 iv = self.pad(iv, block_size, padding)
             for block in blocks:
-                nb = self.bitwise_xor(
-                    self.hex_to_bin(block), self.hex_to_bin(iv)
-                )
-                nb = self.encrypt_block(self.bin_to_hex(nb))
-                iv = nb
-                result = result + nb
-            return result
+                xored = self.bitwise_xor_bytes(block, iv)
+                encrypted = self.encrypt_block(xored)
+                iv = encrypted
+                result.extend(encrypted)
+            return bytes(result)
         raise ValueError(f"Unknown mode '{mode}'")
 
-    def decrypt_mode(self, block_size, plt, mode="CBC", padding="", iv=""):
-        """Split the hex ciphertext into blocks and decrypt them in the
-        requested mode (ECB or CBC)."""
+    def decrypt_mode(self, block_size: int, ciphertext: bytes, mode: str = "CBC",
+                     padding: str = "", iv: bytes = b"") -> bytes:
+        """Split the ciphertext into blocks and decrypt them in the
+        requested mode (ECB or CBC). Block size is in bytes."""
         blocks = [
-            plt[i : i + block_size] for i in range(0, len(plt), block_size)
+            ciphertext[i:i + block_size] for i in range(0, len(ciphertext), block_size)
         ]
         if mode == "ECB":
-            result = ""
+            result = bytearray()
             for block in blocks:
-                result = result + self.decrypt_block(block)
-            return self.unpad(result, block_size, padding)
+                result.extend(self.decrypt_block(block))
+            return self.unpad(bytes(result), block_size, padding)
         if mode == "CBC":
-            result = ""
+            result = bytearray()
             if len(iv) != block_size:
                 iv = self.pad(iv, block_size, padding)
             for block in blocks:
-                nb = self.decrypt_block(block)
-                nb = self.bitwise_xor(self.hex_to_bin(nb), self.hex_to_bin(iv))
-                nb = self.bin_to_hex(nb)
+                decrypted = self.decrypt_block(block)
+                xored = self.bitwise_xor_bytes(decrypted, iv)
                 iv = block
-                result = result + nb
-            return self.unpad(result, block_size, padding)
+                result.extend(xored)
+            return self.unpad(bytes(result), block_size, padding)
         raise ValueError(f"Unknown mode '{mode}'")
+
+    def encrypt_hex(self, plaintext: str, mode: str = "CBC", padding: str = "", iv: str = "") -> str:
+        """Encrypt a hex plaintext string, returning hex ciphertext."""
+        pt_bytes = self.hex_to_bytes(plaintext)
+        iv_bytes = self.hex_to_bytes(iv) if iv else b""
+        block_size = self.get_block_size()
+        ct_bytes = self.encrypt_mode(block_size, pt_bytes, mode, padding, iv_bytes)
+        return self.bytes_to_hex(ct_bytes)
+
+    def decrypt_hex(self, ciphertext: str, mode: str = "CBC", padding: str = "", iv: str = "") -> str:
+        """Decrypt a hex ciphertext string, returning hex plaintext."""
+        ct_bytes = self.hex_to_bytes(ciphertext)
+        iv_bytes = self.hex_to_bytes(iv) if iv else b""
+        block_size = self.get_block_size()
+        pt_bytes = self.decrypt_mode(block_size, ct_bytes, mode, padding, iv_bytes)
+        return self.bytes_to_hex(pt_bytes)
+
+    def get_block_size(self) -> int:
+        """Return block size in bytes. Override in subclass."""
+        raise NotImplementedError("Subclass must implement get_block_size()")
+
+    def encrypt(self, plaintext: Union[bytes, str], mode: str = "CBC", 
+                padding: str = "ISO 7816-4", iv: Union[bytes, str] = b"") -> Union[bytes, str]:
+        """Encrypt plaintext (bytes or hex string) in the requested mode and padding."""
+        if isinstance(plaintext, str):
+            return self.encrypt_hex(plaintext, mode, padding, iv if isinstance(iv, str) else iv.hex())
+        iv_bytes = iv if isinstance(iv, bytes) else (self.hex_to_bytes(iv) if iv else b"")
+        block_size = self.get_block_size()
+        return self.encrypt_mode(block_size, plaintext, mode, padding, iv_bytes)
+
+    def decrypt(self, ciphertext: Union[bytes, str], mode: str = "CBC",
+                padding: str = "ISO 7816-4", iv: Union[bytes, str] = b"") -> Union[bytes, str]:
+        """Decrypt ciphertext (bytes or hex string) in the requested mode and padding."""
+        if isinstance(ciphertext, str):
+            return self.decrypt_hex(ciphertext, mode, padding, iv if isinstance(iv, str) else iv.hex())
+        iv_bytes = iv if isinstance(iv, bytes) else (self.hex_to_bytes(iv) if iv else b"")
+        block_size = self.get_block_size()
+        return self.decrypt_mode(block_size, ciphertext, mode, padding, iv_bytes)

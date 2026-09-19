@@ -35,16 +35,17 @@ def main():
     for i, (key, pt, ct) in enumerate(DES_KATS):
         c = DES()
         c.generate_keys(key)
-        got = c.encrypt_block(pt)
-        check("des kat %02d encrypt" % (i + 1), got, ct)
-        check("des kat %02d decrypt" % (i + 1), c.decrypt_block(got), pt)
+        got = c.encrypt_block(bytes.fromhex(pt))
+        check("des kat %02d encrypt" % (i + 1), got.hex(), ct)
+        check("des kat %02d decrypt" % (i + 1),
+              c.decrypt_block(got).hex(), pt)
 
     print("== Triple DES known-answer test ==")
     c = TrippleDES()
     c.generate_keys(DES3_KEY)
-    ct = c.encrypt_block("123456ABCD132536")
-    check("3des encrypt", ct, "e6803bea92016d52")
-    check("3des decrypt", c.decrypt_block(ct), "123456ABCD132536")
+    ct = c.encrypt_block(bytes.fromhex("123456ABCD132536"))
+    check("3des encrypt", ct.hex(), "e6803bea92016d52")
+    check("3des decrypt", c.decrypt_block(ct).hex(), "123456ABCD132536")
 
     print("== DES ECB multi-block round trip ==")
     c = DES()
