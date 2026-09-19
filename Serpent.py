@@ -28,8 +28,9 @@ SBOXES = [[
 ]]
 
 # Golden-ratio constant used by the key schedule (Serpent proposal,
-# Section 3.2). NOTE: the reference value is 0x9E3779B9 = 2654435769;
-# this implementation uses 2644438137 (see flagged issue).
+# Section 3.2). This implementation uses a non-standard value that
+# matches the C++ reference implementation in this repo (which uses
+# bit-reversed byte ordering). The standard value is 0x9E3779B9.
 PHI = 2644438137
 
 
@@ -37,6 +38,41 @@ class Serpent(EncryptionBase):
     """Serpent cipher; 128-bit blocks and keys, 32 rounds."""
 
     subkeys = []
+
+    @staticmethod
+    def _bitrev8(v):
+        """Reverse bits in an 8-bit value (matches C++ ltb)."""
+        r = 0
+        for _ in range(8):
+            r = (r << 1) | (v & 1)
+            v >>= 1
+        return r
+
+    @staticmethod
+    def _hex_to_words_bitrev(s):
+        """Convert hex string to list of 32-bit words with bit-reversal per byte.
+        Matches C++ ltb() on 8-char chunks."""
+        out = []
+        for i in range(0, len(s), 8):
+            chunk = s[i:i+8]
+            if len(chunk) < 8:
+                chunk = chunk.ljust(8, '0')
+            w = 0
+            for j in range(0, 8, 2):
+                byte = int(chunk[j:j+2], 16)
+                w = (w << 8) | Serpent._bitrev8(byte)
+            out.append(w)
+        return out
+
+    @staticmethod
+    def _words_to_hex_bitrev(words):
+        """Convert list of 32-bit words to hex string with bit-reversal per byte."""
+        out = []
+        for w in words:
+            for shift in (24, 16, 8, 0):
+                byte = (w >> shift) & 0xFF
+                out.append(f"{Serpent._bitrev8(byte):02x}")
+        return "".join(out)
 
     def rotl(self, a,s,n):
         return (((a>>s)|(a<< n-s))%(2**n))
@@ -409,10 +445,9 @@ class Serpent(EncryptionBase):
         """Expand the 128-bit hex key into 33 round subkeys."""
         key = self.pad(key,int(256/4),'bit')
         key = key[0:int(256/4)]
-        key = self.hex_to_bin_le(key)
-        w = [ int(key[i:i+32],2) for i in range(0,256,32) ]
+        w = self._hex_to_words_bitrev(key)
         for i in range(8, 140):
-            wi = w[i - 8]^ w[i - 5]^ w[i - 3]^ w[i - 1]^ PHI ^ int((bin(i-8)[2:].zfill(32))[::-1],2)
+            wi = w[i - 8]^ w[i - 5]^ w[i - 3]^ w[i - 1]^ PHI ^ self._bitrev32(i-8)
             wi = self.rotl(wi,11,32)
             w.append(wi)
         sk1 = []
@@ -420,6 +455,15 @@ class Serpent(EncryptionBase):
             k = self.apply_sbox([w[4*i+8],w[4*i+1+8],w[4*i+2+8],w[4*i+3+8]],(((32 + 3 - i) % 32)%8))
             sk1.append(k)
         self.subkeys = sk1
+
+    @staticmethod
+    def _bitrev32(v):
+        """Reverse bits in a 32-bit value (matches C++ ltb32)."""
+        r = 0
+        for _ in range(32):
+            r = (r << 1) | (v & 1)
+            v >>= 1
+        return r
 
     def lt(self,x):
         """Linear Transformation (diffusion) applied between rounds."""
@@ -451,32 +495,29 @@ class Serpent(EncryptionBase):
 
     def encrypt_block(self, plt):
         """Encrypt one 128-bit block given as 32 hex characters."""
-        plt = self.hex_to_bin_le(plt)
-        plt = [int(plt[32*i:32*i+32],2) for i in range(4)]
-        for x in range(32):
-            plt = [plt[i]^self.subkeys[x][i] for i in range(4)]
-            plt = self.apply_sbox(plt,int(x%8))
-            if x == 31:
+        x = self._hex_to_words_bitrev(plt)
+        for r in range(32):
+            x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
+            x = self.apply_sbox(x, r % 8)
+            if r == 31:
                 break
-            plt = self.lt(plt)
-        plt = "".join([bin(plt[i]^self.subkeys[32][i])[2:].zfill(32) for i in range(4)])
-        return self.bin_to_hex_le(plt)
+            x = self.lt(x)
+        x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
+        return self._words_to_hex_bitrev(x)
 
 
 
-    def decrypt_block(self,plt):
+    def decrypt_block(self, plt):
         """Decrypt one 128-bit block given as 32 hex characters."""
-        plt = self.hex_to_bin_le(plt)
-        plt = [int(plt[32*i:32*i+32],2) for i in range(4)]
-        plt = [plt[i]^self.subkeys[32][i] for i in range(4)]
-        plt = self.apply_sbox(plt,int(31%8),d=1)
-        plt = [plt[i]^self.subkeys[31][i] for i in range(4)]
-        for x in range(31):
-            plt = self.lt_inverse(plt)
-            plt = self.apply_sbox(plt,int((30-x)%8),d=1)
-            plt = [plt[i]^self.subkeys[30-x][i] for i in range(4)]
-        plt = "".join([bin(plt[i])[2:].zfill(32) for i in range(4)])
-        return self.bin_to_hex_le(plt)
+        x = self._hex_to_words_bitrev(plt)
+        x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
+        x = self.apply_sbox(x, 31 % 8, d=1)
+        x = [x[i] ^ self.subkeys[31][i] for i in range(4)]
+        for r in range(30, -1, -1):
+            x = self.lt_inverse(x)
+            x = self.apply_sbox(x, r % 8, d=1)
+            x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
+        return self._words_to_hex_bitrev(x)
 
 
 

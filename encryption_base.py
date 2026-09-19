@@ -249,6 +249,60 @@ class EncryptionBase:
             return st
         raise ValueError(f"Unknown padding type '{typ}'")
 
+    def unpad(self, st, leng, typ="bit"):
+        """Remove the padding added by :meth:`pad` from a hex string.
+
+        Returns ``st`` unchanged when the trailing bytes do not form a valid
+        pad for ``typ``. Zero and character padding are ambiguous and left
+        untouched, mirroring the C/C++ reference implementations.
+        """
+        if typ in ("", "0", "byt", "None"):
+            return st
+        if typ == "PKCS":
+            if len(st) < 2:
+                return st
+            count = st[-2:]
+            n = int(count, 16)
+            if n < 1 or n * 2 > len(st) or n * 2 > leng:
+                return st
+            if st[-2 * n :].lower() == count.lower() * n:
+                return st[: -2 * n]
+            return st
+        if typ == "ANSI X9.23":
+            if len(st) < 2:
+                return st
+            count = st[-2:]
+            n = int(count, 16)
+            if n < 1 or n * 2 > len(st) or n * 2 > leng:
+                return st
+            if st[-2:].lower() != count.lower():
+                return st
+            if st[-2 * n : -2].lower() == "00" * (n - 1):
+                return st[: -2 * n]
+            return st
+        if typ in ("ISO 7816-4", "bit"):
+            limit = max(0, len(st) - leng)
+            i = len(st) - 2
+            while i >= limit and st[i : i + 2] == "00":
+                i -= 2
+            if i >= limit and st[i : i + 2].lower() == "80":
+                return st[:i]
+            return st
+        if typ == "TBC":
+            bits = self.hex_to_bin(st)
+            if len(bits) == 0:
+                return st
+            limit = max(0, len(bits) - leng * 4)
+            last = bits[-1]
+            i = len(bits) - 1
+            while i >= limit and bits[i] == last:
+                i -= 1
+            stripped = len(bits) - 1 - i
+            if 0 < stripped <= leng * 4 and stripped % 4 == 0:
+                return self.bin_to_hex(bits[: len(bits) - stripped])
+            return st
+        raise ValueError(f"Unknown padding type '{typ}'")
+
     def pad_key_hex(self, key, sizes):
         """Pad a hex key to the first allowed ``sizes`` value (in hex
         characters) that fits it, or truncate it to the largest size."""
@@ -277,7 +331,9 @@ class EncryptionBase:
         blocks = [
             plt[i : i + block_size] for i in range(0, len(plt), block_size)
         ]
-        if len(blocks[-1]) < block_size:
+        if len(blocks) == 0:
+            blocks = [self.pad(plt, block_size, padding)]
+        elif len(blocks[-1]) < block_size:
             blocks[len(blocks) - 1] = self.pad(
                 blocks[len(blocks) - 1], block_size, padding
             )
@@ -311,7 +367,7 @@ class EncryptionBase:
             result = ""
             for block in blocks:
                 result = result + self.decrypt_block(block)
-            return result
+            return self.unpad(result, block_size, padding)
         if mode == "CBC":
             result = ""
             if len(iv) != block_size:
@@ -322,5 +378,5 @@ class EncryptionBase:
                 nb = self.bin_to_hex(nb)
                 iv = block
                 result = result + nb
-            return result
+            return self.unpad(result, block_size, padding)
         raise ValueError(f"Unknown mode '{mode}'")

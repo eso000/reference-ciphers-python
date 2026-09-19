@@ -201,12 +201,8 @@ class TrippleDES(EncryptionBase):
 
     def encrypt(self, plt, mode="CBC", padding="bit", iv=""):
         """Encrypt a plaintext hex string in the requested mode and padding."""
-        plt = self.des1.encrypt(plt, mode, padding, iv)
-        plt = self.des2.decrypt(plt, mode, padding, iv)
-        return self.des3.encrypt(plt, mode, padding, iv)
+        return self.encrypt_mode(16, plt, mode, padding, iv)
 
     def decrypt(self, plt, mode="CBC", padding="bit", iv=""):
         """Decrypt a ciphertext hex string in the requested mode and padding."""
-        plt = self.des3.decrypt(plt, mode, padding, iv)
-        plt = self.des2.encrypt(plt, mode, padding, iv)
-        return self.des1.decrypt(plt, mode, padding, iv)
+        return self.decrypt_mode(16, plt, mode, padding, iv)
