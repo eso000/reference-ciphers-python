@@ -55,12 +55,12 @@ if c.decrypt_block(bytes.fromhex(cipher)).hex() != "74b57f06d9d78c2aec14559a74cf
 
 
 c = Serpent()
-c.generate_keys("5468617473206d79204b756e672046755468617473206d79204b756e67204675")
-cipher = c.encrypt_block(bytes.fromhex("74b57f06d9d78c2aec14559a74cf973c")).hex()
-if cipher != 'ae6170a46ed549b9f97a17f1cc8ac2f1':
+c.generate_keys("8000000000000000000000000000000000000000000000000000000000000000")
+cipher = c.encrypt_block(bytes.fromhex("00000000000000000000000000000000")).hex()
+if cipher != 'a223aa1288463c0e2be38ebd825616c0':
 	passed = False
 	print("Serpent failed to encrypt")
-if c.decrypt_block(bytes.fromhex(cipher)).hex() != "74b57f06d9d78c2aec14559a74cf973c":
+if c.decrypt_block(bytes.fromhex(cipher)).hex() != "00000000000000000000000000000000":
 	passed = False
 	print("Serpent failed to decrypt")
 
