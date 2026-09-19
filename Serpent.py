@@ -446,9 +446,9 @@ class Serpent(EncryptionBase):
 
     def generate_keys(self, key):
         """Expand the 128-bit hex key into 33 round subkeys."""
-        # Crypto++ pads the key words as k0[keylen/4] |= 1 << ((keylen%4)*8),
-        # i.e. a little-endian '1' bit in the byte immediately after the key
-        # bytes (hex value 01 there, zeros elsewhere). Expand to 32 bytes.
+        # The spec pads short keys by appending a '1' bit, i.e. a byte of
+        # 0x01 immediately after the key bytes, then zeros to 256 bits.
+        # Expand to 32 bytes.
         target = 32
         if len(key) % 2:
             key += "0"
