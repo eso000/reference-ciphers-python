@@ -101,7 +101,7 @@ python3 verify_vectors.py
 
 ## Requirements
 
-- Python 3.9+
+- Python 3.10+
 - No third-party packages required to use the ciphers or run the built-in tests.
 - Optional: pycrypto (or pycryptodome), libtomcrypt, and GNU nettle to enable
   the independent oracle checks in `verify_vectors.py`.

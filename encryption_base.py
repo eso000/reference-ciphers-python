@@ -140,28 +140,25 @@ class EncryptionBase:
         if shortfall <= 0:
             return data
 
-        if typ == "bit":
-            # Bit padding: append 0x80 then zeros
-            return data + b"\x80" + b"\x00" * (shortfall - 1)
-        if typ == "TBC":
-            # Trailing bit complement - not common, simple implementation
-            last_bit = data[-1] & 1
-            complement = bytes([last_bit ^ 1]) * shortfall
-            return data + complement
-        if typ in ("byt", "0"):
-            # Zero padding
-            return data + b"\x00" * shortfall
-        if typ == "ISO 7816-4":
-            # ISO 7816-4: append 0x80 then zeros
-            return data + b"\x80" + b"\x00" * (shortfall - 1)
-        if typ == "PKCS":
-            # PKCS#7: pad with byte value = padding length
-            pad_byte = shortfall
-            return data + bytes([pad_byte]) * shortfall
-        if typ == "ANSI X9.23":
-            # ANSI X9.23: zeros then padding length
-            return data + b"\x00" * (shortfall - 1) + bytes([shortfall])
-        raise ValueError(f"Unknown padding type '{typ}'")
+        match typ:
+            case "ISO 7816-4" | "bit":
+                # ISO 7816-4 / bit padding: append 0x80 then zeros
+                return data + b"\x80" + b"\x00" * (shortfall - 1)
+            case "TBC":
+                # Trailing bit complement - not common, simple implementation
+                last_bit = data[-1] & 1
+                return data + bytes([last_bit ^ 1]) * shortfall
+            case "byt" | "0":
+                # Zero padding
+                return data + b"\x00" * shortfall
+            case "PKCS":
+                # PKCS#7: pad with byte value = padding length
+                return data + bytes([shortfall]) * shortfall
+            case "ANSI X9.23":
+                # ANSI X9.23: zeros then padding length
+                return data + b"\x00" * (shortfall - 1) + bytes([shortfall])
+            case _:
+                raise ValueError(f"Unknown padding type '{typ}'")
 
     def unpad(self, data: bytes, length: int, typ: str = "bit") -> bytes:
         """Remove the padding added by :meth:`pad` from ``data``.
@@ -170,43 +167,44 @@ class EncryptionBase:
         pad for ``typ``. Zero and character padding are ambiguous and left
         untouched.
         """
-        if typ in ("", "0", "byt", "None"):
-            return data
         if len(data) == 0:
             return data
-
-        if typ == "PKCS":
-            pad_byte = data[-1]
-            if pad_byte < 1 or pad_byte > length or pad_byte > len(data):
+        match typ:
+            case "" | "0" | "byt" | "None":
                 return data
-            if data[-pad_byte:] == bytes([pad_byte]) * pad_byte:
-                return data[:-pad_byte]
-            return data
-        if typ == "ANSI X9.23":
-            pad_byte = data[-1]
-            if pad_byte < 1 or pad_byte > length or pad_byte > len(data):
+            case "PKCS":
+                pad_byte = data[-1]
+                if pad_byte < 1 or pad_byte > length or pad_byte > len(data):
+                    return data
+                if data[-pad_byte:] == bytes([pad_byte]) * pad_byte:
+                    return data[:-pad_byte]
                 return data
-            if data[-pad_byte:-1] == b"\x00" * (pad_byte - 1) and data[-1] == pad_byte:
-                return data[:-pad_byte]
-            return data
-        if typ in ("ISO 7816-4", "bit"):
-            # Find last 0x80 preceded by zeros
-            for i in range(len(data) - 1, max(-1, len(data) - length - 1), -1):
-                if data[i] == 0x80:
-                    if data[i + 1 :] == b"\x00" * (len(data) - i - 1):
-                        return data[:i]
-            return data
-        if typ == "TBC":
-            # Trailing bit complement - find where bits stop being complement
-            last_bit = data[-1] & 1
-            i = len(data) - 1
-            while i >= max(0, len(data) - length) and (data[i] & 1) == last_bit:
-                i -= 1
-            stripped = len(data) - 1 - i
-            if 0 < stripped <= length and stripped % 1 == 0:
-                return data[: len(data) - stripped]
-            return data
-        raise ValueError(f"Unknown padding type '{typ}'")
+            case "ANSI X9.23":
+                pad_byte = data[-1]
+                if pad_byte < 1 or pad_byte > length or pad_byte > len(data):
+                    return data
+                if data[-pad_byte:-1] == b"\x00" * (pad_byte - 1) and data[-1] == pad_byte:
+                    return data[:-pad_byte]
+                return data
+            case "ISO 7816-4" | "bit":
+                # Find last 0x80 preceded by zeros
+                for i in range(len(data) - 1, max(-1, len(data) - length - 1), -1):
+                    if data[i] == 0x80:
+                        if data[i + 1 :] == b"\x00" * (len(data) - i - 1):
+                            return data[:i]
+                return data
+            case "TBC":
+                # Trailing bit complement - find where bits stop being complement
+                last_bit = data[-1] & 1
+                i = len(data) - 1
+                while i >= max(0, len(data) - length) and (data[i] & 1) == last_bit:
+                    i -= 1
+                stripped = len(data) - 1 - i
+                if 0 < stripped <= length and stripped % 1 == 0:
+                    return data[: len(data) - stripped]
+                return data
+            case _:
+                raise ValueError(f"Unknown padding type '{typ}'")
 
     def pad_key_hex(self, key: str, sizes: List[int]) -> str:
         """Pad a hex key to the first allowed ``sizes`` value (in hex characters)
@@ -234,60 +232,62 @@ class EncryptionBase:
         elif len(blocks[-1]) < block_size:
             blocks[-1] = self.pad(blocks[-1], block_size, padding)
 
-        if mode == "ECB":
-            result = bytearray()
-            for block in blocks:
-                result.extend(self.encrypt_block(block))
-            return bytes(result)
-        if mode == "CBC":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            for block in blocks:
-                xored = self.bitwise_xor_bytes(block, iv)
-                encrypted = self.encrypt_block(xored)
-                iv = encrypted
-                result.extend(encrypted)
-            return bytes(result)
-        if mode == "PCBC":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            for block in blocks:
-                encrypted = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
-                iv = self.bitwise_xor_bytes(block, encrypted)
-                result.extend(encrypted)
-            return bytes(result)
-        if mode == "CFB":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            for block in blocks:
-                encrypted = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
-                iv = encrypted
-                result.extend(encrypted)
-            return bytes(result)
-        if mode == "OFB":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            for block in blocks:
-                iv = self.encrypt_block(iv)
-                result.extend(self.bitwise_xor_bytes(block, iv))
-            return bytes(result)
-        if mode == "CTR":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            counter = int.from_bytes(iv, "big")
-            for block in blocks:
-                keystream = self.encrypt_block(
-                    counter.to_bytes(block_size, "big")
-                )
-                counter += 1
-                result.extend(self.bitwise_xor_bytes(block, keystream))
-            return bytes(result)
-        raise ValueError(f"Unknown mode '{mode}'")
+        match mode:
+            case "ECB":
+                result = bytearray()
+                for block in blocks:
+                    result.extend(self.encrypt_block(block))
+                return bytes(result)
+            case "CBC":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                for block in blocks:
+                    xored = self.bitwise_xor_bytes(block, iv)
+                    encrypted = self.encrypt_block(xored)
+                    iv = encrypted
+                    result.extend(encrypted)
+                return bytes(result)
+            case "PCBC":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                for block in blocks:
+                    encrypted = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
+                    iv = self.bitwise_xor_bytes(block, encrypted)
+                    result.extend(encrypted)
+                return bytes(result)
+            case "CFB":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                for block in blocks:
+                    encrypted = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
+                    iv = encrypted
+                    result.extend(encrypted)
+                return bytes(result)
+            case "OFB":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                for block in blocks:
+                    iv = self.encrypt_block(iv)
+                    result.extend(self.bitwise_xor_bytes(block, iv))
+                return bytes(result)
+            case "CTR":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                counter = int.from_bytes(iv, "big")
+                for block in blocks:
+                    keystream = self.encrypt_block(
+                        counter.to_bytes(block_size, "big")
+                    )
+                    counter += 1
+                    result.extend(self.bitwise_xor_bytes(block, keystream))
+                return bytes(result)
+            case _:
+                raise ValueError(f"Unknown mode '{mode}'")
 
     def decrypt_mode(
         self,
@@ -303,60 +303,62 @@ class EncryptionBase:
             ciphertext[i : i + block_size]
             for i in range(0, len(ciphertext), block_size)
         ]
-        if mode == "ECB":
-            result = bytearray()
-            for block in blocks:
-                result.extend(self.decrypt_block(block))
-            return self.unpad(bytes(result), block_size, padding)
-        if mode == "CBC":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            for block in blocks:
-                decrypted = self.decrypt_block(block)
-                xored = self.bitwise_xor_bytes(decrypted, iv)
-                iv = block
-                result.extend(xored)
-            return self.unpad(bytes(result), block_size, padding)
-        if mode == "PCBC":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            for block in blocks:
-                decrypted = self.bitwise_xor_bytes(self.decrypt_block(block), iv)
-                iv = self.bitwise_xor_bytes(block, decrypted)
-                result.extend(decrypted)
-            return self.unpad(bytes(result), block_size, padding)
-        if mode == "CFB":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            for block in blocks:
-                decrypted = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
-                iv = block
-                result.extend(decrypted)
-            return self.unpad(bytes(result), block_size, padding)
-        if mode == "OFB":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            for block in blocks:
-                iv = self.encrypt_block(iv)
-                result.extend(self.bitwise_xor_bytes(block, iv))
-            return self.unpad(bytes(result), block_size, padding)
-        if mode == "CTR":
-            result = bytearray()
-            if len(iv) != block_size:
-                iv = self.pad(iv, block_size, padding)
-            counter = int.from_bytes(iv, "big")
-            for block in blocks:
-                keystream = self.encrypt_block(
-                    counter.to_bytes(block_size, "big")
-                )
-                counter += 1
-                result.extend(self.bitwise_xor_bytes(block, keystream))
-            return self.unpad(bytes(result), block_size, padding)
-        raise ValueError(f"Unknown mode '{mode}'")
+        match mode:
+            case "ECB":
+                result = bytearray()
+                for block in blocks:
+                    result.extend(self.decrypt_block(block))
+                return self.unpad(bytes(result), block_size, padding)
+            case "CBC":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                for block in blocks:
+                    decrypted = self.decrypt_block(block)
+                    xored = self.bitwise_xor_bytes(decrypted, iv)
+                    iv = block
+                    result.extend(xored)
+                return self.unpad(bytes(result), block_size, padding)
+            case "PCBC":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                for block in blocks:
+                    decrypted = self.bitwise_xor_bytes(self.decrypt_block(block), iv)
+                    iv = self.bitwise_xor_bytes(block, decrypted)
+                    result.extend(decrypted)
+                return self.unpad(bytes(result), block_size, padding)
+            case "CFB":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                for block in blocks:
+                    decrypted = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
+                    iv = block
+                    result.extend(decrypted)
+                return self.unpad(bytes(result), block_size, padding)
+            case "OFB":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                for block in blocks:
+                    iv = self.encrypt_block(iv)
+                    result.extend(self.bitwise_xor_bytes(block, iv))
+                return self.unpad(bytes(result), block_size, padding)
+            case "CTR":
+                result = bytearray()
+                if len(iv) != block_size:
+                    iv = self.pad(iv, block_size, padding)
+                counter = int.from_bytes(iv, "big")
+                for block in blocks:
+                    keystream = self.encrypt_block(
+                        counter.to_bytes(block_size, "big")
+                    )
+                    counter += 1
+                    result.extend(self.bitwise_xor_bytes(block, keystream))
+                return self.unpad(bytes(result), block_size, padding)
+            case _:
+                raise ValueError(f"Unknown mode '{mode}'")
 
     def encrypt_hex(
         self, plaintext: str, mode: str = "CBC", padding: str = "", iv: str = ""
