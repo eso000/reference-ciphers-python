@@ -4,7 +4,10 @@ Vectors: the standard DES test values plus the repository's own single and
 triple DES KATs.
 """
 
-from DES import DES, TrippleDES
+import random
+
+from DES import (DES, TrippleDES, IP, FP, SPBOXES, _build_spboxes,
+                 ip_perm_alt, fp_perm_alt)
 
 _FAILS = 0
 
@@ -30,15 +33,73 @@ DES_KEY = "AABB09182736CCDD"
 DES3_KEY = "AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c"
 
 
+def permutate_int_reference(val, perm, width):
+    """Reference permutation by table index, for cross-checking the networks."""
+    out = 0
+    for p in perm:
+        src = width - 1 - (p - 1)
+        out = (out << 1) | ((val >> src) & 1)
+    return out
+
+
 def main():
-    print("== DES known-answer tests ==")
-    for i, (key, pt, ct) in enumerate(DES_KATS):
-        c = DES()
-        c.generate_keys(key)
-        got = c.encrypt_block(bytes.fromhex(pt))
-        check("des kat %02d encrypt" % (i + 1), got.hex(), ct)
-        check("des kat %02d decrypt" % (i + 1),
-              c.decrypt_block(got).hex(), pt)
+    print("== IP/FP alternative networks vs spec tables ==")
+    random.seed(42)
+    checked = 0
+    for _ in range(500):
+        x = random.getrandbits(64)
+        if ip_perm_alt(x) == permutate_int_reference(x, IP, 64):
+            checked += 1
+    check("ip_perm_alt equals IP table (500 random blocks)", checked, 500)
+    checked = 0
+    for _ in range(500):
+        x = random.getrandbits(64)
+        if fp_perm_alt(x) == permutate_int_reference(x, FP, 64):
+            checked += 1
+    check("fp_perm_alt equals FP table (500 random blocks)", checked, 500)
+    checked = 0
+    for _ in range(500):
+        x = random.getrandbits(64)
+        if fp_perm_alt(ip_perm_alt(x)) == x:
+            checked += 1
+    check("fp_perm_alt(ip_perm_alt(x)) == x (500 random blocks)", checked, 500)
+
+    print("== SPBOXES literal vs reference generator ==")
+    check("SPBOXES literal == _build_spboxes() derivation",
+          SPBOXES == _build_spboxes(), True)
+
+    print("== DES known-answer tests (both IP/FP implementations) ==")
+    for alt in (True, False):
+        for i, (key, pt, ct) in enumerate(DES_KATS):
+            c = DES(use_alt=alt)
+            c.generate_keys(key)
+            got = c.encrypt_block(bytes.fromhex(pt))
+            check("des alt=%s kat %02d encrypt" % (alt, i + 1), got.hex(), ct)
+            check("des alt=%s kat %02d decrypt" % (alt, i + 1),
+                  c.decrypt_block(got).hex(), pt)
+
+    print("== f() vs SP-fused f_alt agree ==")
+    c = DES()
+    checked = 0
+    for _ in range(500):
+        blk = random.getrandbits(32)
+        subkey = random.getrandbits(48)
+        if c.f(blk, subkey) == c.f_alt(blk, subkey):
+            checked += 1
+    check("f_alt == f on random (32-bit half, 48-bit subkey)", checked, 500)
+
+    print("== DES alt vs naive mode agree ==")
+    for key, pt, _ in DES_KATS:
+        a = DES(use_alt=True)
+        b = DES(use_alt=False)
+        a.generate_keys(key)
+        b.generate_keys(key)
+        check("des alt==naive encrypt (%s)" % key,
+              a.encrypt_block(bytes.fromhex(pt)),
+              b.encrypt_block(bytes.fromhex(pt)))
+        check("des alt==naive decrypt (%s)" % key,
+              a.decrypt_block(bytes.fromhex(pt)),
+              b.decrypt_block(bytes.fromhex(pt)))
 
     print("== Triple DES known-answer test ==")
     c = TrippleDES()
