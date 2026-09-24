@@ -5,6 +5,8 @@ Vectors: the official NESSIE/verified Serpent test vectors (sets 1-4,
 standard little-endian octet order (matching GNU nettle).
 """
 
+import random
+
 from Serpent import Serpent
 
 _FAILS = 0
@@ -77,13 +79,131 @@ KATS = [
 
 
 def main():
-    print("== Serpent known-answer tests ==")
-    for name, key, pt, ct in KATS:
-        c = Serpent()
-        c.generate_keys(key)
-        got = c.encrypt_block(bytes.fromhex(pt))
-        check(name + " encrypt", got.hex(), ct)
-        check(name + " decrypt", c.decrypt_block(got).hex(), pt)
+    print("== S-box gate networks vs bit-sliced table ==")
+    random.seed(1)
+    c = Serpent()
+    total = 0
+    checked_f = 0
+    checked_i = 0
+    for _ in range(200):
+        x = [random.getrandbits(32) for _ in range(4)]
+        for n in range(8):
+            total += 1
+            if c.apply_sbox(list(x), n, d=0) == c.apply_sbox_bit(list(x), n, d=0):
+                checked_f += 1
+            if c.apply_sbox(list(x), n, d=1) == c.apply_sbox_bit(list(x), n, d=1):
+                checked_i += 1
+    check("gate == table forward (%d random words x 8 boxes)" % total,
+          checked_f, total)
+    check("gate == table inverse (%d random words x 8 boxes)" % total,
+          checked_i, total)
+
+    print("== bit-sliced table: forward then inverse is identity ==")
+    checked = 0
+    for _ in range(200):
+        x0 = [random.getrandbits(32) for _ in range(4)]
+        for n in range(8):
+            if c.apply_sbox_bit(c.apply_sbox_bit(list(x0), n, d=0), n, d=1) == x0:
+                checked += 1
+    check("table inverse == inverse of forward (all 8 boxes)", checked, total)
+
+    print("== Serpent known-answer tests (both S-box implementations) ==")
+    for alt in (True, False):
+        for name, key, pt, ct in KATS:
+            c = Serpent(use_alt=alt)
+            c.generate_keys(key)
+            got = c.encrypt_block(bytes.fromhex(pt))
+            check("serpent alt=%s %s encrypt" % (alt, name), got.hex(), ct)
+            check("serpent alt=%s %s decrypt" % (alt, name),
+                  c.decrypt_block(got).hex(), pt)
+
+    print("== serpent alt vs table mode agree ==")
+    for name, key, pt, _ in KATS:
+        a = Serpent(use_alt=True)
+        b = Serpent(use_alt=False)
+        a.generate_keys(key)
+        b.generate_keys(key)
+        check("serpent alt==table encrypt (%s)" % name,
+              a.encrypt_block(bytes.fromhex(pt)),
+              b.encrypt_block(bytes.fromhex(pt)))
+        check("serpent alt==table decrypt (%s)" % name,
+              a.decrypt_block(bytes.fromhex(pt)),
+              b.decrypt_block(bytes.fromhex(pt)))
+
+    print("== serpent alt vs table multi-block ECB/CBC agree ==")
+    for mode in ("ECB", "CBC"):
+        a = Serpent(use_alt=True)
+        b = Serpent(use_alt=False)
+        a.generate_keys(K256)
+        b.generate_keys(K256)
+        pt = "".join("%02x" % (0x10 + i) for i in range(32))
+        iv = "00000000000000000000000000000000" if mode == "CBC" else ""
+        ct_a = a.encrypt(pt, mode=mode, iv=iv)
+        ct_b = b.encrypt(pt, mode=mode, iv=iv)
+        check("serpent alt==table %s encrypt" % mode.lower(), ct_a, ct_b)
+        check("serpent alt==table %s decrypt" % mode.lower(),
+              a.decrypt(ct_a, mode=mode, iv=iv), b.decrypt(ct_a, mode=mode, iv=iv))
+
+    print("== bytes key == hex string key ==")
+    for name, key, pt, _ in KATS:
+        for alt in (True, False):
+            a = Serpent(use_alt=alt)
+            b = Serpent(use_alt=alt)
+            a.generate_keys(key)
+            b.generate_keys(bytes.fromhex(key))
+            check("serpent bytes==hex %s alt=%s" % (name, alt),
+                  a.encrypt_block(bytes.fromhex(pt)),
+                  b.encrypt_block(bytes.fromhex(pt)))
+    s = Serpent()
+    s.generate_keys(b"\x00")
+    t = Serpent()
+    t.generate_keys("00")
+    check("1-byte bytes key == 1-byte hex key (spec 0x01 pad path)",
+          s.encrypt_block(bytes.fromhex("00000000000000000000000000000000")),
+          t.encrypt_block(bytes.fromhex("00000000000000000000000000000000")))
+
+    print("== key padding/truncation edge cases ==")
+    for alt in (True, False):
+        o = Serpent(use_alt=alt)
+        e = Serpent(use_alt=alt)
+        o.generate_keys("800")
+        e.generate_keys("8000")
+        check("serpent odd-length hex key == padded even (alt=%s)" % alt,
+              o.subkeys, e.subkeys)
+        z = "1f" * 36
+        long = Serpent(use_alt=alt)
+        short = Serpent(use_alt=alt)
+        long.generate_keys(z)
+        short.generate_keys(z[:64])
+        check("serpent 288-bit key truncated to 256 bits (alt=%s)" % alt,
+              long.subkeys, short.subkeys)
+
+    print("== randomized round trip and alt agreement ==")
+    random.seed(42)
+    rt_total = 0
+    rt_ok = 0
+    alt_total = 0
+    alt_ok = 0
+    for _ in range(20):
+        key = "".join("%02x" % random.randrange(256) for _ in range(random.choice([16, 24, 32])))
+        pt = bytes(random.randrange(256) for _ in range(16))
+        for alt in (True, False):
+            c = Serpent(use_alt=alt)
+            c.generate_keys(key)
+            ct = c.encrypt_block(pt)
+            rt_total += 1
+            if c.decrypt_block(ct) == pt:
+                rt_ok += 1
+        a = Serpent(use_alt=True)
+        b = Serpent(use_alt=False)
+        a.generate_keys(key)
+        b.generate_keys(key)
+        alt_total += 1
+        if a.encrypt_block(pt) == b.encrypt_block(pt):
+            alt_ok += 1
+    check("random round trip decrypt(encrypt(pt)) == pt (%d cases)" % rt_total,
+          rt_ok, rt_total)
+    check("random alt == table ciphertext (%d cases)" % alt_total, alt_ok, alt_total)
 
     print("== ECB multi-block round trip ==")
     c = Serpent()

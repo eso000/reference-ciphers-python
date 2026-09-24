@@ -1,5 +1,7 @@
 """Serpent (Anderson, Biham and Knudsen 1998), implemented step by step for teaching."""
 
+from typing import Union
+
 from encryption_base import EncryptionBase
 
 # The Serpent S-box tables (SBOXES) are in the appendix at the end of this file.
@@ -12,10 +14,21 @@ PHI = 2644438137
 
 
 class Serpent(EncryptionBase):
-    """Serpent cipher; 128-bit blocks and keys, 32 rounds."""
+    """Serpent cipher; 128-bit blocks and keys, 32 rounds.
 
-    def __init__(self):
+    ``use_alt`` selects the S-box implementation: ``True`` (default) uses the
+    word-sliced gate networks in apply_sbox (fast, and byte-for-byte the
+    C++ reference), ``False`` uses the bit-sliced table path apply_sbox_bit
+    driven by the SBOXES appendix. Both produce identical ciphertext.
+    """
+
+    def __init__(self, use_alt: bool = True):
         self.subkeys = []
+        self.use_alt = use_alt
+
+    def _sbox(self, x, n, d=0):
+        """Dispatch to the selected S-box implementation."""
+        return self.apply_sbox(x, n, d) if self.use_alt else self.apply_sbox_bit(x, n, d)
 
     @staticmethod
     def _bitrev8(v):
@@ -413,11 +426,13 @@ class Serpent(EncryptionBase):
             return [r3, r0, r1, r4]
         return x
 
-    def generate_keys(self, key):
+    def generate_keys(self, key: Union[bytes, str]) -> None:
         """Expand the 128-bit hex key into 33 round subkeys."""
         # The spec pads short keys by appending a '1' bit, i.e. a byte of
         # 0x01 immediately after the key bytes, then zeros to 256 bits.
         # Expand to 32 bytes.
+        if isinstance(key, bytes):
+            key = key.hex()
         target = 32
         if len(key) % 2:
             key += "0"
@@ -433,7 +448,7 @@ class Serpent(EncryptionBase):
             w.append(wi)
         sk1 = []
         for i in range(33):
-            k = self.apply_sbox(
+            k = self._sbox(
                 [w[4 * i + 8], w[4 * i + 1 + 8], w[4 * i + 2 + 8], w[4 * i + 3 + 8]],
                 (((32 + 3 - i) % 32) % 8),
             )
@@ -486,7 +501,7 @@ class Serpent(EncryptionBase):
         x = self._hex_to_words_bitrev(plaintext.hex())
         for r in range(32):
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
-            x = self.apply_sbox(x, r % 8)
+            x = self._sbox(x, r % 8)
             if r == 31:
                 break
             x = self.lt(x)
@@ -497,11 +512,11 @@ class Serpent(EncryptionBase):
         """Decrypt one 128-bit block given as bytes."""
         x = self._hex_to_words_bitrev(ciphertext.hex())
         x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
-        x = self.apply_sbox(x, 31 % 8, d=1)
+        x = self._sbox(x, 31 % 8, d=1)
         x = [x[i] ^ self.subkeys[31][i] for i in range(4)]
         for r in range(30, -1, -1):
             x = self.lt_inverse(x)
-            x = self.apply_sbox(x, r % 8, d=1)
+            x = self._sbox(x, r % 8, d=1)
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
         return bytes.fromhex(self._words_to_hex_bitrev(x))
 
