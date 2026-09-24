@@ -42,16 +42,16 @@ class Blowfish(EncryptionBase):
         self.subkeys = keys
         self.sboxes = [row[:] for row in SBOXES]
 
-        p = 0
+        p = bytes(8)
         for i in range(0, 18, 2):
-            p = self._encrypt_int(p)
-            self.subkeys[i] = p >> 32
-            self.subkeys[i + 1] = p & 0xFFFFFFFF
+            p = self.encrypt_block(p)
+            self.subkeys[i] = int.from_bytes(p[:4], "big")
+            self.subkeys[i + 1] = int.from_bytes(p[4:], "big")
         for x in range(4):
             for i in range(0, 256, 2):
-                p = self._encrypt_int(p)
-                self.sboxes[x][i] = p >> 32
-                self.sboxes[x][i + 1] = p & 0xFFFFFFFF
+                p = self.encrypt_block(p)
+                self.sboxes[x][i] = int.from_bytes(p[:4], "big")
+                self.sboxes[x][i + 1] = int.from_bytes(p[4:], "big")
 
     def f(self, x: int) -> int:
         """Round function: split a 32-bit word into bytes and combine the four S-box outputs."""
@@ -65,8 +65,9 @@ class Blowfish(EncryptionBase):
         result = (result + quart3) % (2**32)
         return result
 
-    def _encrypt_int(self, block: int) -> int:
-        """Encrypt one 64-bit block given as an integer."""
+    def encrypt_block(self, plaintext: bytes) -> bytes:
+        """Encrypt one 64-bit block given as 8 bytes."""
+        block = int.from_bytes(plaintext[:8], "big")
         left = block >> 32
         right = block & 0xFFFFFFFF
 
@@ -79,10 +80,11 @@ class Blowfish(EncryptionBase):
 
         new_right = left ^ self.subkeys[16]
         new_left = right ^ self.subkeys[17]
-        return 2**32 * new_left + new_right
+        return (2**32 * new_left + new_right).to_bytes(8, "big")
 
-    def _decrypt_int(self, block: int) -> int:
-        """Decrypt one 64-bit block given as an integer."""
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
+        """Decrypt one 64-bit block given as 8 bytes."""
+        block = int.from_bytes(ciphertext[:8], "big")
         left = block >> 32
         right = block & 0xFFFFFFFF
 
@@ -95,17 +97,7 @@ class Blowfish(EncryptionBase):
 
         new_right = left ^ self.subkeys[1]
         new_left = right ^ self.subkeys[0]
-        return 2**32 * new_left + new_right
-
-    def encrypt_block(self, plaintext: bytes) -> bytes:
-        """Encrypt one 64-bit block given as 8 bytes."""
-        block = int.from_bytes(plaintext[:8], "big")
-        return self._encrypt_int(block).to_bytes(8, "big")
-
-    def decrypt_block(self, ciphertext: bytes) -> bytes:
-        """Decrypt one 64-bit block given as 8 bytes."""
-        block = int.from_bytes(ciphertext[:8], "big")
-        return self._decrypt_int(block).to_bytes(8, "big")
+        return (2**32 * new_left + new_right).to_bytes(8, "big")
 
 #
 # ---- Blowfish data tables (appendix) ----
