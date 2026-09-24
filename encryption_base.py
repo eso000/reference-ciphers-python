@@ -148,7 +148,7 @@ class EncryptionBase:
             last_bit = data[-1] & 1
             complement = bytes([last_bit ^ 1]) * shortfall
             return data + complement
-        if typ == "byt" or typ == "0":
+        if typ in ("byt", "0"):
             # Zero padding
             return data + b"\x00" * shortfall
         if typ == "ISO 7816-4":

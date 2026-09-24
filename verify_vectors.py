@@ -16,6 +16,7 @@ Oracles that are not importable/loadable are skipped and reported as SKIP.
 The script exits non-zero if any vector fails or any oracle disagrees.
 """
 
+import ctypes
 from typing import Callable, Dict, List, Tuple
 
 from AES import AES
@@ -30,6 +31,12 @@ from DESTest import DES_KATS as DES_VEC
 from SerpentTest import KATS as SERPENT_VEC
 from TwofishTest import KATS as TF_VEC
 
+try:
+    from Crypto.Cipher import AES as PY_AES, DES as PY_DES, DES3 as PY_DES3
+    from Crypto.Cipher import Blowfish as PY_BF
+except ImportError:
+    PY_AES = PY_DES = PY_DES3 = PY_BF = None
+
 Kats = List[Tuple[str, str, str, str]]
 
 DES3_VEC: Kats = [
@@ -40,13 +47,15 @@ BF_SK_PT = "FEDCBA9876543210"
 
 
 def named(triples: List[Tuple[str, str, str]], prefix: str) -> Kats:
-    return [(prefix + " %d" % i, k, p, c)
+    """Prefix a sequence of (key, plaintext, ciphertext) triples with names."""
+    return [(f"{prefix} {i}", k, p, c)
             for i, (k, p, c) in enumerate(triples)]
 
 
 def programs() -> Dict[str, Kats]:
+    """Assemble every KAT collection keyed by cipher name."""
     bf = named(BF_VEC, "official")
-    bf += [("set_key %d" % (len(k) * 4), k, BF_SK_PT, c) for k, c in BF_SK]
+    bf += [(f"set_key {len(k) * 4}", k, BF_SK_PT, c) for k, c in BF_SK]
     return {
         "AES": AES_VEC,
         "DES": named(DES_VEC, "des"),
@@ -61,6 +70,7 @@ PROGRAMS = programs()
 
 
 def get_impl(cipher: str):
+    """Return (generate_keys, encrypt_block, decrypt_block) for ``cipher``."""
     classes = {"AES": AES, "DES": DES, "DES3": TrippleDES,
                "Blowfish": Blowfish, "Twofish": Twofish, "Serpent": Serpent}
     obj = classes[cipher]()
@@ -68,11 +78,10 @@ def get_impl(cipher: str):
 
 
 def official_oracles() -> Dict[str, List[Tuple[str, Callable, Callable]]]:
+    """Locate any installed external crypto libraries usable as oracles."""
     found: Dict[str, List[Tuple[str, Callable, Callable]]] = {}
-    try:
-        from Crypto.Cipher import AES as _AES, DES as _DES, DES3 as _DES3
-        from Crypto.Cipher import Blowfish as _BF
 
+    if PY_AES is not None:
         def ecb(mod):
             def enc(key: bytes, pt: bytes) -> str:
                 return mod.new(key, mod.MODE_ECB).encrypt(pt).hex()
@@ -82,15 +91,12 @@ def official_oracles() -> Dict[str, List[Tuple[str, Callable, Callable]]]:
 
             return enc, dec
 
-        for name, mod in (("AES", _AES), ("DES", _DES),
-                          ("DES3", _DES3), ("Blowfish", _BF)):
+        for name, mod in (("AES", PY_AES), ("DES", PY_DES),
+                          ("DES3", PY_DES3), ("Blowfish", PY_BF)):
             enc, dec = ecb(mod)
             found[name] = [("pycrypto", enc, dec)]
-    except ImportError:
-        pass
 
     try:
-        import ctypes
         tom = ctypes.CDLL("libtomcrypt.so.1")
         ctx = ctypes.create_string_buffer(16384)
 
@@ -117,7 +123,6 @@ def official_oracles() -> Dict[str, List[Tuple[str, Callable, Callable]]]:
         pass
 
     try:
-        import ctypes
         net = ctypes.CDLL("libnettle.so.8")
         ser = ctypes.create_string_buffer(16384)
 
@@ -145,6 +150,7 @@ def official_oracles() -> Dict[str, List[Tuple[str, Callable, Callable]]]:
 
 
 def run(cipher: str) -> Tuple[str, List[str]]:
+    """Verify ``cipher`` against its vectors and any available oracles."""
     make_keys, enc_block, dec_block = get_impl(cipher)
     vecs = PROGRAMS[cipher]
     reports: List[str] = []
@@ -156,9 +162,8 @@ def run(cipher: str) -> Tuple[str, List[str]]:
         ok = got.lower() == ct.lower() and got_d.lower() == pt.lower()
         passed += ok
         if not ok:
-            reports.append("  FAIL %-20s enc=%s dec=%s want=%s"
-                           % (name, got, got_d, ct))
-    line = "  in-repo  : %d/%d passed" % (passed, len(vecs))
+            reports.append(f"  FAIL {name:<20} enc={got} dec={got_d} want={ct}")
+    line = f"  in-repo  : {passed}/{len(vecs)} passed"
     oracles = official_oracles().get(cipher, [])
     for label, enc, dec in oracles:
         results = []
@@ -166,23 +171,24 @@ def run(cipher: str) -> Tuple[str, List[str]]:
             try:
                 enc_ok = enc(bytes.fromhex(key), bytes.fromhex(pt)) == ct.lower()
                 dec_ok = dec(bytes.fromhex(key), bytes.fromhex(ct)) == pt.lower()
-            except Exception:
+            except (ValueError, OSError, RuntimeError):
                 enc_ok = dec_ok = False
             results.append(enc_ok and dec_ok)
         n_ok = sum(results)
-        line += "\n  %-11s: %d/%d passed" % (label, n_ok, len(vecs))
+        line += f"\n  {label:<11}: {n_ok}/{len(vecs)} passed"
         if n_ok != len(vecs):
             bad = [vecs[i][0] for i, ok in enumerate(results) if not ok]
-            reports.append("  %s FAILED vectors: %s" % (label, ", ".join(bad)))
+            reports.append(f"  {label} FAILED vectors: {', '.join(bad)}")
     if not oracles:
         line += "\n  oracles  : SKIP (no library for this cipher installed)"
     return line, reports
 
 
 def main() -> int:
+    """Run all ciphers and report the combined status."""
     failures = 0
     for cipher in ("AES", "DES", "DES3", "Blowfish", "Twofish", "Serpent"):
-        print("== %s ==" % cipher)
+        print(f"== {cipher} ==")
         line, reports = run(cipher)
         print(line)
         for r in reports:
@@ -191,7 +197,7 @@ def main() -> int:
             failures += 1
         print()
     if failures:
-        print("FAILURES: %d cipher(s) have failing vectors" % failures)
+        print(f"FAILURES: {failures} cipher(s) have failing vectors")
         return 1
     print("ALL VECTORS PASSED for in-repo ciphers and all detected oracles")
     return 0

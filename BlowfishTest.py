@@ -11,7 +11,8 @@ _FAILS = 0
 
 
 def check(name, got, want):
-    global _FAILS
+    """Print PASS/FAIL for a comparison and bump the failure counter."""
+    global _FAILS  # pylint: disable=global-statement
     if isinstance(got, str) and isinstance(want, str):
         ok = got.lower() == want.lower()
     else:
@@ -87,8 +88,9 @@ SET_KEY = [
 
 
 def run_official():
+    """Run Schneier's 34-entry official ECB KAT set."""
     for i, (key, pt, ct) in enumerate(OFFICIAL):
-        name = "official ecb %02d" % (i + 1)
+        name = f"official ecb {i + 1:02d}"
         c = Blowfish()
         c.generate_keys(key)
         got = c.encrypt_block(bytes.fromhex(pt))
@@ -97,14 +99,16 @@ def run_official():
 
 
 def run_set_key():
+    """Run the 24 set_key vectors covering 1- to 24-byte keys."""
     for key, ct in SET_KEY:
         c = Blowfish()
         c.generate_keys(key)
-        name = "set_key %d-byte key" % (len(key) // 2)
+        name = f"set_key {len(key) // 2}-byte key"
         check(name, c.encrypt_block(bytes.fromhex("FEDCBA9876543210")).hex(), ct)
 
 
 def main():
+    """Run Blowfish KAT, mode, key-ring, and padding checks."""
     print("== Blowfish official ECB vectors ==")
     run_official()
 
@@ -119,7 +123,7 @@ def main():
     print("== ECB multi-block round trip ==")
     c = Blowfish()
     c.generate_keys("0123456789abcdef")
-    pt = "".join("%02x" % (0xA5 + i) for i in range(24))
+    pt = "".join(f"{0xA5 + i:02x}" for i in range(24))
     ct = c.encrypt(pt, mode="ECB")
     check("ecb ciphertext differs from plaintext", ct != pt, True)
     check("ecb encrypt+decrypt restores plaintext", c.decrypt(ct, mode="ECB"), pt)
@@ -152,18 +156,18 @@ def main():
 
     print("== standard key schedule (non-aligned key lengths) ==")
     for label, key in (("3-byte", "AABBCC"),
-                       ("56-byte (max)", "".join("%02x" % ((i * 37) % 256) for i in range(56)))):
+                       ("56-byte (max)", "".join(f"{((i * 37) % 256):02x}" for i in range(56)))):
         c = Blowfish()
         c.generate_keys(key)
         pt = "123456abcd132536"
         ct = c.encrypt_block(bytes.fromhex(pt)).hex()
-        check("%s key: ciphertext differs from plaintext" % label, ct != pt, True)
-        check("%s key: encrypt+decrypt restores plaintext" % label,
+        check(f"{label} key: ciphertext differs from plaintext", ct != pt, True)
+        check(f"{label} key: encrypt+decrypt restores plaintext",
               c.decrypt_block(bytes.fromhex(ct)).hex(), pt)
 
     print("== key length validation ==")
     for label, key in (("empty key rejected", ""),
-                       ("57-byte key rejected", "".join("%02x" % (i % 256) for i in range(57)))):
+                       ("57-byte key rejected", "".join(f"{i % 256:02x}" for i in range(57)))):
         try:
             Blowfish().generate_keys(key)
             check(label, False, True)
@@ -171,7 +175,7 @@ def main():
             check(label, True, True)
 
     print()
-    print("%d test(s) failed" % _FAILS)
+    print(f"{_FAILS} test(s) failed")
     return 1 if _FAILS else 0
 
 

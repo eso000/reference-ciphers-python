@@ -13,7 +13,8 @@ _FAILS = 0
 
 
 def check(name, got, want):
-    global _FAILS
+    """Print PASS/FAIL for a comparison and bump the failure counter."""
+    global _FAILS  # pylint: disable=global-statement
     if isinstance(got, str) and isinstance(want, str):
         ok = got.lower() == want.lower()
     else:
@@ -79,6 +80,7 @@ KATS = [
 
 
 def main():
+    """Run Serpent S-box, KAT, key, mode, and padding checks."""
     print("== S-box gate networks vs bit-sliced table ==")
     random.seed(1)
     c = Serpent()
@@ -93,9 +95,9 @@ def main():
                 checked_f += 1
             if c.apply_sbox(list(x), n, d=1) == c.apply_sbox_bit(list(x), n, d=1):
                 checked_i += 1
-    check("gate == table forward (%d random words x 8 boxes)" % total,
+    check(f"gate == table forward ({total} random words x 8 boxes)",
           checked_f, total)
-    check("gate == table inverse (%d random words x 8 boxes)" % total,
+    check(f"gate == table inverse ({total} random words x 8 boxes)",
           checked_i, total)
 
     print("== bit-sliced table: forward then inverse is identity ==")
@@ -113,8 +115,8 @@ def main():
             c = Serpent(use_alt=alt)
             c.generate_keys(key)
             got = c.encrypt_block(bytes.fromhex(pt))
-            check("serpent alt=%s %s encrypt" % (alt, name), got.hex(), ct)
-            check("serpent alt=%s %s decrypt" % (alt, name),
+            check(f"serpent alt={alt} {name} encrypt", got.hex(), ct)
+            check(f"serpent alt={alt} {name} decrypt",
                   c.decrypt_block(got).hex(), pt)
 
     print("== serpent alt vs table mode agree ==")
@@ -123,10 +125,10 @@ def main():
         b = Serpent(use_alt=False)
         a.generate_keys(key)
         b.generate_keys(key)
-        check("serpent alt==table encrypt (%s)" % name,
+        check(f"serpent alt==table encrypt ({name})",
               a.encrypt_block(bytes.fromhex(pt)),
               b.encrypt_block(bytes.fromhex(pt)))
-        check("serpent alt==table decrypt (%s)" % name,
+        check(f"serpent alt==table decrypt ({name})",
               a.decrypt_block(bytes.fromhex(pt)),
               b.decrypt_block(bytes.fromhex(pt)))
 
@@ -136,12 +138,12 @@ def main():
         b = Serpent(use_alt=False)
         a.generate_keys(K256)
         b.generate_keys(K256)
-        pt = "".join("%02x" % (0x10 + i) for i in range(32))
+        pt = "".join(f"{0x10 + i:02x}" for i in range(32))
         iv = "00000000000000000000000000000000" if mode == "CBC" else ""
         ct_a = a.encrypt(pt, mode=mode, iv=iv)
         ct_b = b.encrypt(pt, mode=mode, iv=iv)
-        check("serpent alt==table %s encrypt" % mode.lower(), ct_a, ct_b)
-        check("serpent alt==table %s decrypt" % mode.lower(),
+        check(f"serpent alt==table {mode.lower()} encrypt", ct_a, ct_b)
+        check(f"serpent alt==table {mode.lower()} decrypt",
               a.decrypt(ct_a, mode=mode, iv=iv), b.decrypt(ct_a, mode=mode, iv=iv))
 
     print("== bytes key == hex string key ==")
@@ -151,7 +153,7 @@ def main():
             b = Serpent(use_alt=alt)
             a.generate_keys(key)
             b.generate_keys(bytes.fromhex(key))
-            check("serpent bytes==hex %s alt=%s" % (name, alt),
+            check(f"serpent bytes==hex {name} alt={alt}",
                   a.encrypt_block(bytes.fromhex(pt)),
                   b.encrypt_block(bytes.fromhex(pt)))
     s = Serpent()
@@ -168,14 +170,14 @@ def main():
         e = Serpent(use_alt=alt)
         o.generate_keys("800")
         e.generate_keys("8000")
-        check("serpent odd-length hex key == padded even (alt=%s)" % alt,
+        check(f"serpent odd-length hex key == padded even (alt={alt})",
               o.subkeys, e.subkeys)
         z = "1f" * 36
         long = Serpent(use_alt=alt)
         short = Serpent(use_alt=alt)
         long.generate_keys(z)
         short.generate_keys(z[:64])
-        check("serpent 288-bit key truncated to 256 bits (alt=%s)" % alt,
+        check(f"serpent 288-bit key truncated to 256 bits (alt={alt})",
               long.subkeys, short.subkeys)
 
     print("== randomized round trip and alt agreement ==")
@@ -185,7 +187,7 @@ def main():
     alt_total = 0
     alt_ok = 0
     for _ in range(20):
-        key = "".join("%02x" % random.randrange(256) for _ in range(random.choice([16, 24, 32])))
+        key = "".join(f"{random.randrange(256):02x}" for _ in range(random.choice([16, 24, 32])))
         pt = bytes(random.randrange(256) for _ in range(16))
         for alt in (True, False):
             c = Serpent(use_alt=alt)
@@ -201,14 +203,14 @@ def main():
         alt_total += 1
         if a.encrypt_block(pt) == b.encrypt_block(pt):
             alt_ok += 1
-    check("random round trip decrypt(encrypt(pt)) == pt (%d cases)" % rt_total,
+    check(f"random round trip decrypt(encrypt(pt)) == pt ({rt_total} cases)",
           rt_ok, rt_total)
-    check("random alt == table ciphertext (%d cases)" % alt_total, alt_ok, alt_total)
+    check(f"random alt == table ciphertext ({alt_total} cases)", alt_ok, alt_total)
 
     print("== ECB multi-block round trip ==")
     c = Serpent()
     c.generate_keys(K256)
-    pt = "".join("%02x" % (0x10 + i) for i in range(32))
+    pt = "".join(f"{0x10 + i:02x}" for i in range(32))
     ct = c.encrypt(pt, mode="ECB")
     check("ecb ciphertext differs from plaintext", ct != pt, True)
     check("ecb encrypt+decrypt restores plaintext", c.decrypt(ct, mode="ECB"), pt)
@@ -216,7 +218,7 @@ def main():
     print("== CBC multi-block round trip ==")
     c = Serpent()
     c.generate_keys("8000000000000000000000000000000000000000000000000000000000000000")
-    pt = "".join("%02x" % (0xA0 + i) for i in range(32))
+    pt = "".join(f"{0xA0 + i:02x}" for i in range(32))
     iv = "00000000000000000000000000000000"
     ct = c.encrypt(pt, mode="CBC", iv=iv)
     check("cbc ciphertext differs from plaintext", ct != pt, True)
@@ -240,7 +242,7 @@ def main():
           len(c.decrypt(ct, mode="ECB", padding="PKCS")), 32)
 
     print()
-    print("%d test(s) failed" % _FAILS)
+    print(f"{_FAILS} test(s) failed")
     return 1 if _FAILS else 0
 
 

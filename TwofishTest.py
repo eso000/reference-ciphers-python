@@ -10,7 +10,8 @@ _FAILS = 0
 
 
 def check(name, got, want):
-    global _FAILS
+    """Print PASS/FAIL for a comparison and bump the failure counter."""
+    global _FAILS  # pylint: disable=global-statement
     if isinstance(got, str) and isinstance(want, str):
         ok = got.lower() == want.lower()
     else:
@@ -42,9 +43,10 @@ KEYS = [
 
 
 def main():
+    """Run Twofish KAT, mode, and padding checks."""
     print("== Twofish known-answer tests ==")
     for i, (key, pt, ct) in enumerate(KATS):
-        name = "kat %02d" % (i + 1)
+        name = f"kat {i + 1:02d}"
         c = Twofish()
         c.generate_keys(key)
         got = c.encrypt_block(bytes.fromhex(pt))
@@ -55,16 +57,16 @@ def main():
     for label, key in KEYS:
         c = Twofish()
         c.generate_keys(key)
-        pt = "".join("%02x" % (0xA5 + i) for i in range(32))
+        pt = "".join(f"{0xA5 + i:02x}" for i in range(32))
         ct = c.encrypt(pt, mode="ECB")
-        check("%s: ciphertext differs from plaintext" % label, ct != pt, True)
-        check("%s: encrypt+decrypt restores plaintext" % label,
+        check(f"{label}: ciphertext differs from plaintext", ct != pt, True)
+        check(f"{label}: encrypt+decrypt restores plaintext",
               c.decrypt(ct, mode="ECB"), pt)
 
     print("== CBC two-block round trip ==")
     c = Twofish()
     c.generate_keys("0123456789abcdef0123456789abcdef")
-    pt = "".join("%02x" % i for i in range(32))
+    pt = "".join(f"{i:02x}" for i in range(32))
     iv = "aa" * 16
     ct = c.encrypt(pt, mode="CBC", iv=iv)
     check("cbc two-block ciphertext differs from plaintext", ct != pt, True)
@@ -86,7 +88,7 @@ def main():
           len(c.decrypt(ct, mode="ECB", padding="PKCS")), 32)
 
     print()
-    print("%d test(s) failed" % _FAILS)
+    print(f"{_FAILS} test(s) failed")
     return 1 if _FAILS else 0
 
 
