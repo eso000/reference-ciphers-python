@@ -8,6 +8,10 @@
 #                      integer rotation - an intentional, documented override.
 #  - too-many-arguments/positional: encrypt_mode/decrypt_mode expose the
 #                      block/mode/padding/iv interface as a flat, teachable API.
+#  - too-many-public-methods: EncryptionBase exposes every conversion and
+#                      mode/padding helper as a public, teachable method.
+#  - duplicate-code:   standalone test modules intentionally repeat tiny
+#                      check()/print idioms instead of sharing a helper.
 
 [BASIC]
 # Module files carry proper-cased cipher names (AES.py, Twofish.py, ...).
@@ -21,4 +25,6 @@ disable=too-many-lines,
     too-many-statements,
     arguments-differ,
     too-many-arguments,
-    too-many-positional-arguments
+    too-many-positional-arguments,
+    too-many-public-methods,
+    duplicate-code

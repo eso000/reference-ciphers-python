@@ -13,7 +13,8 @@ _FAILS = 0
 
 
 def check(name, got, want):
-    global _FAILS
+    """Print PASS/FAIL for a comparison and bump the failure counter."""
+    global _FAILS  # pylint: disable=global-statement
     if isinstance(got, str) and isinstance(want, str):
         ok = got.lower() == want.lower()
     else:
@@ -43,6 +44,7 @@ def permutate_int_reference(val, perm, width):
 
 
 def main():
+    """Run DES/3DES permutation, KAT, mode, and padding checks."""
     print("== IP/FP alternative networks vs spec tables ==")
     random.seed(42)
     checked = 0
@@ -74,8 +76,8 @@ def main():
             c = DES(use_alt=alt)
             c.generate_keys(key)
             got = c.encrypt_block(bytes.fromhex(pt))
-            check("des alt=%s kat %02d encrypt" % (alt, i + 1), got.hex(), ct)
-            check("des alt=%s kat %02d decrypt" % (alt, i + 1),
+            check(f"des alt={alt} kat {i + 1:02d} encrypt", got.hex(), ct)
+            check(f"des alt={alt} kat {i + 1:02d} decrypt",
                   c.decrypt_block(got).hex(), pt)
 
     print("== f() vs SP-fused f_alt agree ==")
@@ -94,10 +96,10 @@ def main():
         b = DES(use_alt=False)
         a.generate_keys(key)
         b.generate_keys(key)
-        check("des alt==naive encrypt (%s)" % key,
+        check(f"des alt==naive encrypt ({key})",
               a.encrypt_block(bytes.fromhex(pt)),
               b.encrypt_block(bytes.fromhex(pt)))
-        check("des alt==naive decrypt (%s)" % key,
+        check(f"des alt==naive decrypt ({key})",
               a.decrypt_block(bytes.fromhex(pt)),
               b.decrypt_block(bytes.fromhex(pt)))
 
@@ -111,7 +113,7 @@ def main():
     print("== DES ECB multi-block round trip ==")
     c = DES()
     c.generate_keys(DES_KEY)
-    pt = "".join("%02x" % (0x10 + i) for i in range(16))
+    pt = "".join(f"{0x10 + i:02x}" for i in range(16))
     ct = c.encrypt(pt, mode="ECB")
     check("des ecb ciphertext differs from plaintext", ct != pt, True)
     check("des ecb encrypt+decrypt restores plaintext",
@@ -120,7 +122,7 @@ def main():
     print("== DES CBC round trip ==")
     c = DES()
     c.generate_keys(DES_KEY)
-    pt = "".join("%02x" % (0xA0 + i) for i in range(16))
+    pt = "".join(f"{0xA0 + i:02x}" for i in range(16))
     iv = "0000000000000000"
     ct = c.encrypt(pt, mode="CBC", iv=iv)
     check("des cbc ciphertext differs from plaintext", ct != pt, True)
@@ -131,12 +133,12 @@ def main():
     for mode in ("ECB", "CBC"):
         c = TrippleDES()
         c.generate_keys(DES3_KEY)
-        pt = "".join("%02x" % (0x30 + i) for i in range(16))
+        pt = "".join(f"{0x30 + i:02x}" for i in range(16))
         iv = "1122334455667788" if mode == "CBC" else ""
         ct = c.encrypt(pt, mode=mode, iv=iv)
-        check("3des %s ciphertext differs from plaintext" % mode.lower(),
+        check(f"3des {mode.lower()} ciphertext differs from plaintext",
               ct != pt, True)
-        check("3des %s encrypt+decrypt restores plaintext" % mode.lower(),
+        check(f"3des {mode.lower()} encrypt+decrypt restores plaintext",
               c.decrypt(ct, mode=mode, iv=iv), pt)
 
     print("== PKCS#7 padding ==")
@@ -154,7 +156,7 @@ def main():
           len(c.decrypt(ct, mode="ECB", padding="PKCS")), 16)
 
     print()
-    print("%d test(s) failed" % _FAILS)
+    print(f"{_FAILS} test(s) failed")
     return 1 if _FAILS else 0
 
 

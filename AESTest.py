@@ -10,7 +10,8 @@ _FAILS = 0
 
 
 def check(name, got, want):
-    global _FAILS
+    """Print PASS/FAIL for a comparison and bump the failure counter."""
+    global _FAILS  # pylint: disable=global-statement
     if isinstance(got, str) and isinstance(want, str):
         ok = got.lower() == want.lower()
     else:
@@ -65,26 +66,29 @@ SP800_CBC = [
 
 
 def run_single_block(kats, label):
+    """Run AES on the single-block FIPS-197 KATs."""
     for name, key, pt, ct in kats:
         c = AES()
         c.generate_keys(key)
         got = c.encrypt_block(bytes.fromhex(pt))
-        check("%s %s encrypt" % (label, name.lower()), got.hex(), ct)
-        check("%s %s decrypt" % (label, name.lower()),
+        check(f"{label} {name.lower()} encrypt", got.hex(), ct)
+        check(f"{label} {name.lower()} decrypt",
               c.decrypt_block(got).hex(), pt)
 
 
 def run_mode_kats(kats, mode, label):
+    """Compare multi-block mode outputs against the SP 800-38A vectors."""
     for name, key, ct in kats:
         c = AES()
         c.generate_keys(key)
         got = c.encrypt(SP800_PT, mode=mode, padding="", iv=SP800_IV)
-        check("%s %s encrypt" % (label, name.lower()), got, ct)
+        check(f"{label} {name.lower()} encrypt", got, ct)
         got = c.decrypt(ct, mode=mode, padding="", iv=SP800_IV)
-        check("%s %s decrypt" % (label, name.lower()), got, SP800_PT)
+        check(f"{label} {name.lower()} decrypt", got, SP800_PT)
 
 
 def main():
+    """Run AES KAT, block-mode, and padding checks."""
     print("== FIPS-197 single block ==")
     run_single_block(FIPS, "fips-197")
 
@@ -98,10 +102,10 @@ def main():
     for name, key in (("AES-128", K128), ("AES-192", K192), ("AES-256", K256)):
         c = AES()
         c.generate_keys(key)
-        pt = "".join("%02x" % (0xA5 + i) for i in range(32))
+        pt = "".join(f"{0xA5 + i:02x}" for i in range(32))
         ct = c.encrypt(pt, mode="ECB")
-        check("%s: ciphertext differs from plaintext" % name, ct != pt, True)
-        check("%s: encrypt+decrypt restores plaintext" % name,
+        check(f"{name}: ciphertext differs from plaintext", ct != pt, True)
+        check(f"{name}: encrypt+decrypt restores plaintext",
               c.decrypt(ct, mode="ECB"), pt)
 
     print("== CBC two-block round trip ==")
@@ -122,7 +126,7 @@ def main():
           c.decrypt(ct, mode="ECB", padding="PKCS"), "abcd")
     ct = c.encrypt("", mode="ECB", padding="PKCS")
     check("empty input padded to one full block", len(ct), 32)
-    pt = "".join("%02x" % (0xA5 + i) for i in range(31))
+    pt = "".join(f"{0xA5 + i:02x}" for i in range(31))
     ct = c.encrypt(pt, mode="ECB", padding="PKCS")
     check("31 bytes padded to two blocks", len(ct), 64)
     check("31 bytes round trip through PKCS padding",
@@ -139,11 +143,11 @@ def main():
             c.generate_keys(K128)
             iv = SP800_IV if mode == "CBC" else ""
             ct = c.encrypt(pt, mode=mode, padding=pad, iv=iv)
-            check("%s %s round trip" % (pad, mode),
+            check(f"{pad} {mode} round trip",
                   c.decrypt(ct, mode=mode, padding=pad, iv=iv), pt)
 
     print()
-    print("%d test(s) failed" % _FAILS)
+    print(f"{_FAILS} test(s) failed")
     return 1 if _FAILS else 0
 
 
