@@ -249,6 +249,44 @@ class EncryptionBase:
                 iv = encrypted
                 result.extend(encrypted)
             return bytes(result)
+        if mode == "PCBC":
+            result = bytearray()
+            if len(iv) != block_size:
+                iv = self.pad(iv, block_size, padding)
+            for block in blocks:
+                encrypted = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
+                iv = self.bitwise_xor_bytes(block, encrypted)
+                result.extend(encrypted)
+            return bytes(result)
+        if mode == "CFB":
+            result = bytearray()
+            if len(iv) != block_size:
+                iv = self.pad(iv, block_size, padding)
+            for block in blocks:
+                encrypted = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
+                iv = encrypted
+                result.extend(encrypted)
+            return bytes(result)
+        if mode == "OFB":
+            result = bytearray()
+            if len(iv) != block_size:
+                iv = self.pad(iv, block_size, padding)
+            for block in blocks:
+                iv = self.encrypt_block(iv)
+                result.extend(self.bitwise_xor_bytes(block, iv))
+            return bytes(result)
+        if mode == "CTR":
+            result = bytearray()
+            if len(iv) != block_size:
+                iv = self.pad(iv, block_size, padding)
+            counter = int.from_bytes(iv, "big")
+            for block in blocks:
+                keystream = self.encrypt_block(
+                    counter.to_bytes(block_size, "big")
+                )
+                counter += 1
+                result.extend(self.bitwise_xor_bytes(block, keystream))
+            return bytes(result)
         raise ValueError(f"Unknown mode '{mode}'")
 
     def decrypt_mode(
@@ -279,6 +317,44 @@ class EncryptionBase:
                 xored = self.bitwise_xor_bytes(decrypted, iv)
                 iv = block
                 result.extend(xored)
+            return self.unpad(bytes(result), block_size, padding)
+        if mode == "PCBC":
+            result = bytearray()
+            if len(iv) != block_size:
+                iv = self.pad(iv, block_size, padding)
+            for block in blocks:
+                decrypted = self.bitwise_xor_bytes(self.decrypt_block(block), iv)
+                iv = self.bitwise_xor_bytes(block, decrypted)
+                result.extend(decrypted)
+            return self.unpad(bytes(result), block_size, padding)
+        if mode == "CFB":
+            result = bytearray()
+            if len(iv) != block_size:
+                iv = self.pad(iv, block_size, padding)
+            for block in blocks:
+                decrypted = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
+                iv = block
+                result.extend(decrypted)
+            return self.unpad(bytes(result), block_size, padding)
+        if mode == "OFB":
+            result = bytearray()
+            if len(iv) != block_size:
+                iv = self.pad(iv, block_size, padding)
+            for block in blocks:
+                iv = self.encrypt_block(iv)
+                result.extend(self.bitwise_xor_bytes(block, iv))
+            return self.unpad(bytes(result), block_size, padding)
+        if mode == "CTR":
+            result = bytearray()
+            if len(iv) != block_size:
+                iv = self.pad(iv, block_size, padding)
+            counter = int.from_bytes(iv, "big")
+            for block in blocks:
+                keystream = self.encrypt_block(
+                    counter.to_bytes(block_size, "big")
+                )
+                counter += 1
+                result.extend(self.bitwise_xor_bytes(block, keystream))
             return self.unpad(bytes(result), block_size, padding)
         raise ValueError(f"Unknown mode '{mode}'")
 

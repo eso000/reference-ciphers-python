@@ -64,7 +64,7 @@ pt = c.decrypt(ct, mode="CBC",
 
 ## Modes and padding
 
-- Modes: **ECB** and **CBC**.
+- Modes: **ECB, CBC, PCBC, CFB, OFB, CTR** (matching the C/C++ ports).
 - Padding: bit-level zero padding and **ISO 7816-4**, plus unpadding.
 - Block-level API (`encrypt_block` / `decrypt_block`) takes exactly one block.
 
@@ -79,6 +79,7 @@ python3 DESTest.py        #   FIPS-197 / SP 800-38A (AES), classic DES values,
 python3 BlowfishTest.py   #   Schneier's Blowfish sets, Twofish KATs,
 python3 TwofishTest.py    #   NESSIE Serpent set
 python3 SerpentTest.py
+python3 ModeTest.py       #   all block modes across every cipher
 ```
 
 `verify_vectors.py` is a cross-implementation harness. It always runs the
@@ -122,6 +123,7 @@ TwofishTest.py       Twofish test vectors
 SerpentTest.py       Serpent (NESSIE) test vectors
 
 test.py              Quick end-to-end smoke test
+ModeTest.py          Block-mode round trips (ECB/CBC/PCBC/CFB/OFB/CTR)
 verify_vectors.py    In-repo + external-oracle verification harness
 benchmark.py         Timing script for the ciphers
 pylintrc             Lint configuration for the teaching-style code
@@ -129,10 +131,11 @@ pylintrc             Lint configuration for the teaching-style code
 
 ## Security notice
 
-This is an educational, from-scratch implementation. It supports only ECB/CBC,
-has no key derivation, no authenticated encryption (no MAC/AEAD), and makes no
-constant-time claims. Do not use it to protect real secrets — use a vetted
-library such as `cryptography` instead.
+This is an educational, from-scratch implementation. It implements classic
+block modes (ECB/CBC/PCBC/CFB/OFB/CTR), has no key derivation, no
+authenticated encryption (no MAC/AEAD), and makes no constant-time claims.
+Do not use it to protect real secrets — use a vetted library such as
+`cryptography` instead.
 
 ## License
 
