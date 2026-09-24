@@ -27,33 +27,7 @@ class EncryptionBase:
         """Decode binary string (8 bits per byte) to bytes."""
         if len(bin_str) % 8 != 0:
             raise ValueError("Binary string length must be multiple of 8")
-        return bytes(int(bin_str[i:i+8], 2) for i in range(0, len(bin_str), 8))
-
-    @staticmethod
-    def hex_to_bin(hex_str: str) -> str:
-        """Expand a hex string into its binary representation."""
-        mp = {
-            "0": "0000", "1": "0001", "2": "0010", "3": "0011",
-            "4": "0100", "5": "0101", "6": "0110", "7": "0111",
-            "8": "1000", "9": "1001", "a": "1010", "b": "1011",
-            "c": "1100", "d": "1101", "e": "1110", "f": "1111",
-            "A": "1010", "B": "1011", "C": "1100", "D": "1101",
-            "E": "1110", "F": "1111",
-        }
-        return "".join(mp[ch] for ch in hex_str)
-
-    @staticmethod
-    def bin_to_hex(bin_str: str) -> str:
-        """Group a binary string into nibbles and render them as hex."""
-        if len(bin_str) % 4 != 0:
-            raise ValueError("Binary string length must be multiple of 4")
-        mp = {
-            "0000": "0", "0001": "1", "0010": "2", "0011": "3",
-            "0100": "4", "0101": "5", "0110": "6", "0111": "7",
-            "1000": "8", "1001": "9", "1010": "a", "1011": "b",
-            "1100": "c", "1101": "d", "1110": "e", "1111": "f",
-        }
-        return "".join(mp[bin_str[i:i+4]] for i in range(0, len(bin_str), 4))
+        return bytes(int(bin_str[i : i + 8], 2) for i in range(0, len(bin_str), 8))
 
     @staticmethod
     def bitwise_xor_bytes(data1: bytes, data2: bytes) -> bytes:
@@ -65,7 +39,9 @@ class EncryptionBase:
     def bitwise_xor_bin(bin_str1: str, bin_str2: str) -> str:
         """XOR two equal-length binary strings."""
         min_len = min(len(bin_str1), len(bin_str2))
-        return "".join("0" if bin_str1[i] == bin_str2[i] else "1" for i in range(min_len))
+        return "".join(
+            "0" if bin_str1[i] == bin_str2[i] else "1" for i in range(min_len)
+        )
 
     @staticmethod
     def permutate_bin(bin_str: str, perm: List[int], start: int = 1) -> str:
@@ -139,7 +115,7 @@ class EncryptionBase:
 
     def pad(self, data: bytes, length: int, typ: str = "bit") -> bytes:
         """Pad ``data`` up to ``length`` bytes using the requested scheme.
-        
+
         Returns it unchanged when already long enough.
         """
         if len(data) == 0:
@@ -173,7 +149,7 @@ class EncryptionBase:
 
     def unpad(self, data: bytes, length: int, typ: str = "bit") -> bytes:
         """Remove the padding added by :meth:`pad` from ``data``.
-        
+
         Returns ``data`` unchanged when the trailing bytes do not form a valid
         pad for ``typ``. Zero and character padding are ambiguous and left
         untouched.
@@ -201,7 +177,7 @@ class EncryptionBase:
             # Find last 0x80 preceded by zeros
             for i in range(len(data) - 1, max(-1, len(data) - length - 1), -1):
                 if data[i] == 0x80:
-                    if data[i+1:] == b"\x00" * (len(data) - i - 1):
+                    if data[i + 1 :] == b"\x00" * (len(data) - i - 1):
                         return data[:i]
             return data
         if typ == "TBC":
@@ -212,7 +188,7 @@ class EncryptionBase:
                 i -= 1
             stripped = len(data) - 1 - i
             if 0 < stripped <= length and stripped % 1 == 0:
-                return data[:len(data) - stripped]
+                return data[: len(data) - stripped]
             return data
         raise ValueError(f"Unknown padding type '{typ}'")
 
@@ -222,14 +198,20 @@ class EncryptionBase:
         for size in sizes:
             if len(key) <= size:
                 return self.pad(bytes.fromhex(key), size // 2, "0").hex()
-        return key[:sizes[-1]]
+        return key[: sizes[-1]]
 
-    def encrypt_mode(self, block_size: int, plaintext: bytes, mode: str = "CBC", 
-                     padding: str = "", iv: bytes = b"") -> bytes:
+    def encrypt_mode(
+        self,
+        block_size: int,
+        plaintext: bytes,
+        mode: str = "CBC",
+        padding: str = "",
+        iv: bytes = b"",
+    ) -> bytes:
         """Split the plaintext into blocks and encrypt them in the
         requested mode (ECB or CBC). Block size is in bytes."""
         blocks = [
-            plaintext[i:i + block_size] for i in range(0, len(plaintext), block_size)
+            plaintext[i : i + block_size] for i in range(0, len(plaintext), block_size)
         ]
         if len(blocks) == 0:
             blocks = [self.pad(plaintext, block_size, padding)]
@@ -253,12 +235,19 @@ class EncryptionBase:
             return bytes(result)
         raise ValueError(f"Unknown mode '{mode}'")
 
-    def decrypt_mode(self, block_size: int, ciphertext: bytes, mode: str = "CBC",
-                     padding: str = "", iv: bytes = b"") -> bytes:
+    def decrypt_mode(
+        self,
+        block_size: int,
+        ciphertext: bytes,
+        mode: str = "CBC",
+        padding: str = "",
+        iv: bytes = b"",
+    ) -> bytes:
         """Split the ciphertext into blocks and decrypt them in the
         requested mode (ECB or CBC). Block size is in bytes."""
         blocks = [
-            ciphertext[i:i + block_size] for i in range(0, len(ciphertext), block_size)
+            ciphertext[i : i + block_size]
+            for i in range(0, len(ciphertext), block_size)
         ]
         if mode == "ECB":
             result = bytearray()
@@ -277,7 +266,9 @@ class EncryptionBase:
             return self.unpad(bytes(result), block_size, padding)
         raise ValueError(f"Unknown mode '{mode}'")
 
-    def encrypt_hex(self, plaintext: str, mode: str = "CBC", padding: str = "", iv: str = "") -> str:
+    def encrypt_hex(
+        self, plaintext: str, mode: str = "CBC", padding: str = "", iv: str = ""
+    ) -> str:
         """Encrypt a hex plaintext string, returning hex ciphertext."""
         pt_bytes = self.hex_to_bytes(plaintext)
         iv_bytes = self.hex_to_bytes(iv) if iv else b""
@@ -285,7 +276,9 @@ class EncryptionBase:
         ct_bytes = self.encrypt_mode(block_size, pt_bytes, mode, padding, iv_bytes)
         return self.bytes_to_hex(ct_bytes)
 
-    def decrypt_hex(self, ciphertext: str, mode: str = "CBC", padding: str = "", iv: str = "") -> str:
+    def decrypt_hex(
+        self, ciphertext: str, mode: str = "CBC", padding: str = "", iv: str = ""
+    ) -> str:
         """Decrypt a hex ciphertext string, returning hex plaintext."""
         ct_bytes = self.hex_to_bytes(ciphertext)
         iv_bytes = self.hex_to_bytes(iv) if iv else b""
@@ -297,20 +290,38 @@ class EncryptionBase:
         """Return block size in bytes. Override in subclass."""
         raise NotImplementedError("Subclass must implement get_block_size()")
 
-    def encrypt(self, plaintext: Union[bytes, str], mode: str = "CBC", 
-                padding: str = "ISO 7816-4", iv: Union[bytes, str] = b"") -> Union[bytes, str]:
+    def encrypt(
+        self,
+        plaintext: Union[bytes, str],
+        mode: str = "CBC",
+        padding: str = "ISO 7816-4",
+        iv: Union[bytes, str] = b"",
+    ) -> Union[bytes, str]:
         """Encrypt plaintext (bytes or hex string) in the requested mode and padding."""
         if isinstance(plaintext, str):
-            return self.encrypt_hex(plaintext, mode, padding, iv if isinstance(iv, str) else iv.hex())
-        iv_bytes = iv if isinstance(iv, bytes) else (self.hex_to_bytes(iv) if iv else b"")
+            return self.encrypt_hex(
+                plaintext, mode, padding, iv if isinstance(iv, str) else iv.hex()
+            )
+        iv_bytes = (
+            iv if isinstance(iv, bytes) else (self.hex_to_bytes(iv) if iv else b"")
+        )
         block_size = self.get_block_size()
         return self.encrypt_mode(block_size, plaintext, mode, padding, iv_bytes)
 
-    def decrypt(self, ciphertext: Union[bytes, str], mode: str = "CBC",
-                padding: str = "ISO 7816-4", iv: Union[bytes, str] = b"") -> Union[bytes, str]:
+    def decrypt(
+        self,
+        ciphertext: Union[bytes, str],
+        mode: str = "CBC",
+        padding: str = "ISO 7816-4",
+        iv: Union[bytes, str] = b"",
+    ) -> Union[bytes, str]:
         """Decrypt ciphertext (bytes or hex string) in the requested mode and padding."""
         if isinstance(ciphertext, str):
-            return self.decrypt_hex(ciphertext, mode, padding, iv if isinstance(iv, str) else iv.hex())
-        iv_bytes = iv if isinstance(iv, bytes) else (self.hex_to_bytes(iv) if iv else b"")
+            return self.decrypt_hex(
+                ciphertext, mode, padding, iv if isinstance(iv, str) else iv.hex()
+            )
+        iv_bytes = (
+            iv if isinstance(iv, bytes) else (self.hex_to_bytes(iv) if iv else b"")
+        )
         block_size = self.get_block_size()
         return self.decrypt_mode(block_size, ciphertext, mode, padding, iv_bytes)

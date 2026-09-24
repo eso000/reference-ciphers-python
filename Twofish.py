@@ -4,39 +4,7 @@ from typing import List, Union
 
 from encryption_base import EncryptionBase
 
-# RS matrix (Twofish, Schneier/Kelsey/Whiting/Wagner/Hall/Ferguson 1998,
-# Section 3.4): maps the key bytes into the S-box vector L. Used by generate_keys.
-RS = [
-    [1, 164, 85, 135, 90, 88, 219, 158],
-    [164, 86, 130, 243, 30, 198, 104, 229],
-    [2, 161, 252, 193, 71, 174, 61, 25],
-    [164, 85, 135, 90, 88, 219, 158, 3],
-]
-
-# MDS matrix (Twofish, Section 2.2.1): mixes the S-box bytes within a 32-bit
-# word. Row v of the matrix lands in byte lane v. Used by mds_lt_m.
-MDS = [
-    [1, 239, 91, 91],
-    [91, 239, 239, 1],
-    [239, 91, 1, 239],
-    [239, 1, 239, 91],
-]
-
-# q0/q1 permutation tables (Twofish, Appendix a.6). Used by q().
-TQ = [
-    [
-        [8, 1, 7, 13, 6, 15, 3, 2, 0, 11, 5, 9, 14, 12, 10, 4],
-        [14, 12, 11, 8, 1, 2, 3, 5, 15, 4, 10, 6, 7, 0, 9, 13],
-        [11, 10, 5, 14, 6, 13, 9, 0, 12, 8, 15, 3, 2, 4, 7, 1],
-        [13, 7, 15, 4, 1, 2, 6, 14, 9, 11, 3, 0, 8, 5, 12, 10],
-    ],
-    [
-        [2, 8, 11, 13, 15, 7, 6, 14, 3, 1, 9, 4, 0, 10, 12, 5],
-        [1, 14, 2, 11, 4, 12, 3, 7, 6, 13, 10, 5, 15, 9, 0, 8],
-        [4, 12, 7, 5, 1, 6, 9, 10, 0, 14, 13, 8, 2, 11, 3, 15],
-        [11, 9, 5, 1, 12, 3, 13, 14, 6, 4, 7, 15, 2, 0, 8, 10],
-    ],
-]
+# Twofish data tables (RS, MDS, TQ) are in the appendix at the end of this file.
 
 # GF(2^8) reduction polynomials (Twofish, Section 3.3).
 MDS_POLY = (1 << 8) + (1 << 6) + (1 << 5) + (1 << 3) + 1  # 0x0169
@@ -352,3 +320,41 @@ class Twofish(EncryptionBase):
         for i in range(4):
             x[i] = x[i] ^ self.subkeys[i]
         return self.words_to_bytes_le(x)
+
+#
+# ---- Twofish data tables (appendix) ----
+#
+
+# RS matrix (Twofish, Schneier/Kelsey/Whiting/Wagner/Hall/Ferguson 1998,
+# Section 3.4): maps the key bytes into the S-box vector L. Used by generate_keys.
+RS = [
+    [1, 164, 85, 135, 90, 88, 219, 158],
+    [164, 86, 130, 243, 30, 198, 104, 229],
+    [2, 161, 252, 193, 71, 174, 61, 25],
+    [164, 85, 135, 90, 88, 219, 158, 3],
+]
+
+# MDS matrix (Twofish, Section 2.2.1): mixes the S-box bytes within a 32-bit
+# word. Row v of the matrix lands in byte lane v. Used by mds_lt_m.
+MDS = [
+    [1, 239, 91, 91],
+    [91, 239, 239, 1],
+    [239, 91, 1, 239],
+    [239, 1, 239, 91],
+]
+
+# q0/q1 permutation tables (Twofish, Appendix a.6). Used by q().
+TQ = [
+    [
+        [8, 1, 7, 13, 6, 15, 3, 2, 0, 11, 5, 9, 14, 12, 10, 4],
+        [14, 12, 11, 8, 1, 2, 3, 5, 15, 4, 10, 6, 7, 0, 9, 13],
+        [11, 10, 5, 14, 6, 13, 9, 0, 12, 8, 15, 3, 2, 4, 7, 1],
+        [13, 7, 15, 4, 1, 2, 6, 14, 9, 11, 3, 0, 8, 5, 12, 10],
+    ],
+    [
+        [2, 8, 11, 13, 15, 7, 6, 14, 3, 1, 9, 4, 0, 10, 12, 5],
+        [1, 14, 2, 11, 4, 12, 3, 7, 6, 13, 10, 5, 15, 9, 0, 8],
+        [4, 12, 7, 5, 1, 6, 9, 10, 0, 14, 13, 8, 2, 11, 3, 15],
+        [11, 9, 5, 1, 12, 3, 13, 14, 6, 4, 7, 15, 2, 0, 8, 10],
+    ],
+]
