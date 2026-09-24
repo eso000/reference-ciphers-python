@@ -54,12 +54,6 @@ class Twofish(EncryptionBase):
     def get_block_size(self) -> int:
         return 16  # 128 bits = 16 bytes
 
-    def rotl(self, a: int, s: int, n: int) -> int:
-        return ((a >> s) | (a << n - s)) % (2**n)
-
-    def rotr(self, a: int, s: int, n: int) -> int:
-        return ((a << s) | (a >> n - s)) % (2**n)
-
     def q(self, x: int, i: int = 0) -> int:
         """Apply the q0/q1 4-bit permutation network to one byte."""
         a0 = int(x / 16)

@@ -52,12 +52,6 @@ class Serpent(EncryptionBase):
                 out.append(f"{Serpent._bitrev8(byte):02x}")
         return "".join(out)
 
-    def rotl(self, a, s, n):
-        return ((a >> s) | (a << n - s)) % (2**n)
-
-    def rotr(self, a, s, n):
-        return ((a << s) | (a >> n - s)) % (2**n)
-
     def apply_sbox_bit(self, x, n, d=0):
         """Bit-sliced S-box: apply S-box n to four 32-bit bit-planes."""
         xn = [0, 0, 0, 0]
@@ -487,9 +481,9 @@ class Serpent(EncryptionBase):
         """Serpent uses a 128-bit (16-byte) block size."""
         return 16
 
-    def encrypt_block(self, block):
+    def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 128-bit block given as bytes."""
-        x = self._hex_to_words_bitrev(block.hex())
+        x = self._hex_to_words_bitrev(plaintext.hex())
         for r in range(32):
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
             x = self.apply_sbox(x, r % 8)
@@ -499,9 +493,9 @@ class Serpent(EncryptionBase):
         x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
         return bytes.fromhex(self._words_to_hex_bitrev(x))
 
-    def decrypt_block(self, block):
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 128-bit block given as bytes."""
-        x = self._hex_to_words_bitrev(block.hex())
+        x = self._hex_to_words_bitrev(ciphertext.hex())
         x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
         x = self.apply_sbox(x, 31 % 8, d=1)
         x = [x[i] ^ self.subkeys[31][i] for i in range(4)]

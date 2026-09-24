@@ -72,6 +72,22 @@ class EncryptionBase:
         return ((val << shifts) | (val >> (width - shifts))) & mask
 
     @staticmethod
+    def rotl(val: int, shifts: int, width: int) -> int:
+        """Cycle ``val`` by ``shifts`` bits within ``width`` bits.
+
+        Mirrors the rotl/rotr macros of the C++ reference this suite ports
+        from, where rotr performs the conventional left rotate and rotl the
+        conventional right rotate. Kept identical so the Serpent and Twofish
+        ports byte-for-byte match that reference.
+        """
+        return ((val >> shifts) | (val << (width - shifts))) % (1 << width)
+
+    @staticmethod
+    def rotr(val: int, shifts: int, width: int) -> int:
+        """Cycle ``val`` by ``shifts`` bits within ``width`` bits; see rotl."""
+        return ((val << shifts) | (val >> (width - shifts))) % (1 << width)
+
+    @staticmethod
     def rotl_str(s: str, shifts: int) -> str:
         """Cyclically rotate a string left by ``shifts`` positions."""
         shifts %= len(s)
