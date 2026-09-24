@@ -73,9 +73,27 @@ class EncryptionBase:
         return "".join(bin_str[i - start] for i in perm)
 
     @staticmethod
+    def permutate_int(val: int, perm: List[int], width: int, start: int = 1) -> int:
+        """Pick bits by the 1-based index list ``perm`` from ``val`` using
+        shifts and masks only (no int-to-string conversion). ``width`` is the
+        bit width of ``val``; the result has ``len(perm)`` bits."""
+        out = 0
+        for p in perm:
+            src = width - 1 - (p - start)  # 1-based index -> shift from LSB
+            out = (out << 1) | ((val >> src) & 1)
+        return out
+
+    @staticmethod
     def permutate_bytes(data: bytes, perm: List[int], start: int = 1) -> bytes:
         """Pick bytes by the 1-based index list ``perm`` from bytes."""
         return bytes(data[i - start] for i in perm)
+
+    @staticmethod
+    def rotl_int(val: int, shifts: int, width: int) -> int:
+        """Cyclically rotate ``val`` left by ``shifts`` bits within ``width``."""
+        shifts %= width
+        mask = (1 << width) - 1
+        return ((val << shifts) | (val >> (width - shifts))) & mask
 
     @staticmethod
     def rotl_str(s: str, shifts: int) -> str:

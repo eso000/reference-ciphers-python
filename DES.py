@@ -104,16 +104,6 @@ P = [
 ]
 
 
-def bits_to_int(bits: str) -> int:
-    """Convert binary string to integer."""
-    return int(bits, 2)
-
-
-def int_to_bits(val: int, length: int) -> str:
-    """Convert integer to binary string of given length."""
-    return format(val, f'0{length}b')
-
-
 class DES(EncryptionBase):
     """DES cipher; 64-bit blocks with 16 hex-character keys."""
 
@@ -129,68 +119,53 @@ class DES(EncryptionBase):
             key = self.hex_to_bytes(key)
         if len(key) < 8:
             key = self.pad(key, 8, "0")
-        key_bits = self.bytes_to_bin(key)
-        key_bits = self.permutate_bin(key_bits, PC1)
-        left_key = key_bits[0:28]
-        right_key = key_bits[28:56]
+        key_bits = self.permutate_int(int.from_bytes(key, "big"), PC1, width=64)
+        left_key = key_bits >> 28
+        right_key = key_bits & 0x0FFFFFFF
         subkeys = []
         for i in range(16):
             if i + 1 in (1, 2, 9, 16):
                 shift = 1
             else:
                 shift = 2
-            left_key = self.rotl_str(left_key, shift)
-            right_key = self.rotl_str(right_key, shift)
-            combined = left_key + right_key
-            subkey_bits = self.permutate_bin(combined, PC2)
-            subkeys.append(bits_to_int(subkey_bits))
+            left_key = self.rotl_int(left_key, shift, 28)
+            right_key = self.rotl_int(right_key, shift, 28)
+            combined = (left_key << 28) | right_key
+            subkeys.append(self.permutate_int(combined, PC2, width=56))
         self.subkeys = subkeys
 
-    def f(self, blk_bits: str, subkey: int) -> str:
+    def f(self, blk: int, subkey: int) -> int:
         """Feistel round function: expansion, key XOR, S-boxes, then the P permutation."""
-        expanded = self.permutate_bin(blk_bits, E)
-        expanded_int = bits_to_int(expanded)
-        mixed = expanded_int ^ subkey
-        mixed_bits = int_to_bits(mixed, 48)
-        sbox_out = ""
+        mixed = self.permutate_int(blk, E, width=32) ^ subkey
+        sbox_out = 0
         for j in range(8):
-            six = mixed_bits[j * 6:j * 6 + 6]
-            row = int(six[0] + six[5], 2)
-            col = int(six[1:5], 2)
-            sbox_out += format(SBOXES[j][row][col], '04b')
-        return self.permutate_bin(sbox_out, P)
+            six = (mixed >> (48 - 6 * (j + 1))) & 0x3F
+            row = ((six >> 4) & 2) | (six & 1)
+            col = (six >> 1) & 0xF
+            sbox_out = (sbox_out << 4) | SBOXES[j][row][col]
+        return self.permutate_int(sbox_out, P, width=32)
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 64-bit block given as 8 bytes."""
-        blk_bits = self.bytes_to_bin(plaintext)
-        blk_bits = self.permutate_bin(blk_bits, IP)
-        left = blk_bits[0:32]
-        right = blk_bits[32:64]
+        block = self.permutate_int(int.from_bytes(plaintext, "big"), IP, width=64)
+        left = block >> 32
+        right = block & 0xFFFFFFFF
         for i in range(16):
-            new_left = right
-            right = self.f(right, self.subkeys[i])
-            new_right = int_to_bits(int(left, 2) ^ int(right, 2), 32)
-            left = new_left
-            right = new_right
-        combined = right + left
-        result_bits = self.permutate_bin(combined, FP)
-        return self.bin_to_bytes(result_bits)
+            left, right = right, left ^ self.f(right, self.subkeys[i])
+        combined = (right << 32) | left
+        result = self.permutate_int(combined, FP, width=64)
+        return result.to_bytes(8, "big")
 
     def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 64-bit block given as 8 bytes."""
-        blk_bits = self.bytes_to_bin(ciphertext)
-        blk_bits = self.permutate_bin(blk_bits, IP)
-        left = blk_bits[0:32]
-        right = blk_bits[32:64]
+        block = self.permutate_int(int.from_bytes(ciphertext, "big"), IP, width=64)
+        left = block >> 32
+        right = block & 0xFFFFFFFF
         for i in range(16):
-            new_left = right
-            right = self.f(right, self.subkeys[15 - i])
-            new_right = int_to_bits(int(left, 2) ^ int(right, 2), 32)
-            left = new_left
-            right = new_right
-        combined = right + left
-        result_bits = self.permutate_bin(combined, FP)
-        return self.bin_to_bytes(result_bits)
+            left, right = right, left ^ self.f(right, self.subkeys[15 - i])
+        combined = (right << 32) | left
+        result = self.permutate_int(combined, FP, width=64)
+        return result.to_bytes(8, "big")
 
 
 class TrippleDES(EncryptionBase):
