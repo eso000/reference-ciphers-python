@@ -2,7 +2,7 @@
 
 from typing import List
 
-from encryption_base import EncryptionBase
+from .encryption_base import EncryptionBase
 
 # Twofish data tables (RS, MDS, TQ) are in the appendix at the end of this file.
 

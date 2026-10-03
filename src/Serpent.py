@@ -1,6 +1,6 @@
 """Serpent (Anderson, Biham and Knudsen 1998), implemented step by step for teaching."""
 
-from encryption_base import EncryptionBase
+from .encryption_base import EncryptionBase
 
 # The Serpent S-box tables (SBOXES) are in the appendix at the end of this file.
 

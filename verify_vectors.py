@@ -19,17 +19,13 @@ The script exits non-zero if any vector fails or any oracle disagrees.
 import ctypes
 from typing import Callable, Dict, List, Tuple
 
-from AES import AES
-from Blowfish import Blowfish
-from DES import DES, TripleDES
-from Serpent import Serpent
-from Twofish import Twofish
+from src.AES import AES
+from src.Blowfish import Blowfish
+from src.DES import DES, TripleDES
+from src.Serpent import Serpent
+from src.Twofish import Twofish
 
-from AESTest import FIPS as AES_VEC
-from BlowfishTest import OFFICIAL as BF_VEC, SET_KEY as BF_SK
-from DESTest import DES_KATS as DES_VEC
-from SerpentTest import KATS as SERPENT_VEC
-from TwofishTest import KATS as TF_VEC
+from tests.vectors import programs as vector_programs
 
 try:
     from Crypto.Cipher import AES as PY_AES, DES as PY_DES, DES3 as PY_DES3
@@ -39,34 +35,7 @@ except ImportError:
 
 Kats = List[Tuple[str, str, str, str]]
 
-DES3_VEC: Kats = [
-    ("3des kat", "AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c",
-     "123456ABCD132536", "e6803bea92016d52"),
-]
-BF_SK_PT = "FEDCBA9876543210"
-
-
-def named(triples: List[Tuple[str, str, str]], prefix: str) -> Kats:
-    """Prefix a sequence of (key, plaintext, ciphertext) triples with names."""
-    return [(f"{prefix} {i}", k, p, c)
-            for i, (k, p, c) in enumerate(triples)]
-
-
-def programs() -> Dict[str, Kats]:
-    """Assemble every KAT collection keyed by cipher name."""
-    bf = named(BF_VEC, "official")
-    bf += [(f"set_key {len(k) * 4}", k, BF_SK_PT, c) for k, c in BF_SK]
-    return {
-        "AES": AES_VEC,
-        "DES": named(DES_VEC, "des"),
-        "DES3": DES3_VEC,
-        "Blowfish": bf,
-        "Twofish": named(TF_VEC, "b2"),
-        "Serpent": SERPENT_VEC,
-    }
-
-
-PROGRAMS = programs()
+PROGRAMS = vector_programs()
 
 
 def get_impl(cipher: str):

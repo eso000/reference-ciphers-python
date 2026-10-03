@@ -1,6 +1,6 @@
 """DES and 3DES (FIPS 46-3), implemented step by step for teaching."""
 
-from encryption_base import EncryptionBase
+from .encryption_base import EncryptionBase
 
 # DES data tables (IP, FP, E, SBOXES, PC1, PC2, P, SPBOXES) and the
 # reference generator _build_spboxes() live in the appendix at the

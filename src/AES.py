@@ -1,6 +1,6 @@
 """Advanced Encryption Standard (FIPS-197), implemented step by step for teaching."""
 
-from encryption_base import EncryptionBase
+from .encryption_base import EncryptionBase
 
 # AES S-box tables (SBOX, INV_SBOX) are in the appendix at the end of this file.
 # Round counts per key size in 32-bit words (FIPS-197 Section 5.4).

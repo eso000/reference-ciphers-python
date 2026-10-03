@@ -2,11 +2,11 @@
 
 import time
 
-from AES import AES
-from Blowfish import Blowfish
-from DES import DES, TripleDES
-from Serpent import Serpent
-from Twofish import Twofish
+from src.AES import AES
+from src.Blowfish import Blowfish
+from src.DES import DES, TripleDES
+from src.Serpent import Serpent
+from src.Twofish import Twofish
 
 CIPHERS = [
     (DES(), "0011223344556677"),

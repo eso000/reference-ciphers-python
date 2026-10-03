@@ -19,7 +19,7 @@ test vectors and, when available, against independent crypto libraries.
 ## Architecture
 
 All ciphers share one abstract base class, `EncryptionBase` in
-`encryption_base.py`. It provides the common building blocks (XOR, bit
+`src/encryption_base.py`. It provides the common building blocks (XOR, bit
 permutations, rotations, padding) and the block-mode `encrypt` / `decrypt`,
 which take and return `bytes`.
 
@@ -43,7 +43,7 @@ Internals follow the specifications rather than optimized tricks:
 ## Usage
 
 ```python
-from AES import AES
+from src import AES
 
 c = AES()
 c.generate_keys(bytes.fromhex("000102030405060708090a0b0c0d0e0f"))
@@ -92,17 +92,24 @@ Lengths are checked strictly and never silently adjusted; a wrong length raises
 
 ## Verification
 
-Every cipher is verified against official vectors:
+The test suite uses `unittest`, so it runs with the standard library alone:
 
 ```bash
-python3 test.py           # quick smoke test, one vector per cipher
-python3 AESTest.py        # per-cipher suites:
-python3 DESTest.py        #   FIPS-197 / SP 800-38A (AES), classic DES values,
-python3 BlowfishTest.py   #   Schneier's Blowfish sets, Twofish KATs,
-python3 TwofishTest.py    #   NESSIE Serpent set
-python3 SerpentTest.py
-python3 ModeTest.py       #   all block modes across every cipher
+python3 -m unittest discover -s tests -t .   # everything
+python3 -m unittest tests.test_aes -v        # one module
 ```
+
+| Module | Covers |
+|---|---|
+| `tests/test_smoke.py` | one headline vector per cipher |
+| `tests/test_aes.py` | FIPS-197 C.1–C.3, SP 800-38A ECB and CBC |
+| `tests/test_des.py` | classic DES vectors, IP/FP and `f` cross-checks, 3DES |
+| `tests/test_blowfish.py` | Schneier's official ECB and `set_key` sets |
+| `tests/test_twofish.py` | the official submission KATs |
+| `tests/test_serpent.py` | the NESSIE/verified sets, plus S-box cross-checks |
+| `tests/test_encryption_base.py` | padding schemes and shared helpers |
+| `tests/test_modes.py` | all six modes, padding and length validation |
+| `tests/vectors.py` | the vector data itself, shared with `verify_vectors.py` |
 
 `verify_vectors.py` is a cross-implementation harness. It always runs the
 in-repo ciphers against the official vectors, then additionally cross-checks
