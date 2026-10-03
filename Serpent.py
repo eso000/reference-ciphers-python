@@ -19,6 +19,8 @@ class Serpent(EncryptionBase):
     produce identical ciphertext.
     """
 
+    block_size = 16  # 128 bits = 16 bytes
+
     def __init__(self, use_alt: bool = True):
         self.subkeys = []
         self.use_alt = use_alt
@@ -476,10 +478,6 @@ class Serpent(EncryptionBase):
         x[2] = self.rotl(x[2], 3, 32)
         x[0] = self.rotl(x[0], 13, 32)
         return x
-
-    def get_block_size(self):
-        """Serpent uses a 128-bit (16-byte) block size."""
-        return 16
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 128-bit block given as bytes."""

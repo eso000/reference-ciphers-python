@@ -44,15 +44,14 @@ def matmulgf(mat: List[List[int]], vec: List[int], pol: int) -> int:
 class Twofish(EncryptionBase):
     """Twofish cipher; 128-bit blocks with 128/192/256-bit keys."""
 
+    block_size = 16  # 128 bits = 16 bytes
+
     def __init__(self):
         self.subkeys: List[int] = []
         self.sbox0: List[int] = []
         self.sbox1: List[int] = []
         self.sbox2: List[int] = []
         self.sbox3: List[int] = []
-
-    def get_block_size(self) -> int:
-        return 16  # 128 bits = 16 bytes
 
     def q(self, x: int, i: int = 0) -> int:
         """Apply the q0/q1 4-bit permutation network to one byte."""

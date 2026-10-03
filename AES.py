@@ -32,11 +32,10 @@ def gmul(a: int, b: int) -> int:
 class AES(EncryptionBase):
     """AES cipher; supports 128/192/256-bit keys and 128-bit blocks."""
 
+    block_size = 16  # 128 bits = 16 bytes
+
     def __init__(self):
         self.subkeys: list[list[int]] = []
-
-    def get_block_size(self) -> int:
-        return 16  # 128 bits = 16 bytes
 
     def sub_bytes(self, state: list[int]) -> list[int]:
         """Substitute each state byte through the AES S-box (FIPS-197 5.1.1)."""

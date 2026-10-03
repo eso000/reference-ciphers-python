@@ -23,10 +23,10 @@ All ciphers share one abstract base class, `EncryptionBase` in
 permutations, rotations, padding) and the block-mode `encrypt` / `decrypt`,
 which take and return `bytes`.
 
-Each cipher subclasses it and implements four methods:
+Each cipher subclasses it, declares its block size, and implements three methods:
 
 ```python
-get_block_size()                 # block size in bytes
+block_size = 16                   # class attribute, bytes
 generate_keys(key)               # key schedule (bytes)
 encrypt_block(plaintext)  -> bytes
 decrypt_block(ciphertext) -> bytes
