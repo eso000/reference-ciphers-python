@@ -53,6 +53,35 @@ def raises_value_error(func):
     return False
 
 
+def raises_type_error(func):
+    """Return True when calling ``func`` raises TypeError."""
+    try:
+        func()
+    except TypeError:
+        return True
+    return False
+
+
+def check_key_types():
+    """Keys must be bytes-like; str (hex) keys are rejected by every cipher."""
+    for cls in (AES, Blowfish, DES, Serpent, Twofish):
+        name = cls.__name__.lower()
+        check(
+            f"{name} hex/str key is rejected",
+            raises_type_error(lambda c=cls: c().generate_keys("0011223344556677")),
+            True,
+        )
+        by_bytes, by_array = cls(), cls()
+        by_bytes.generate_keys(bytes(range(8)))
+        by_array.generate_keys(bytearray(range(8)))
+        block = bytes(by_bytes.get_block_size())
+        check(
+            f"{name} bytearray key matches bytes key",
+            by_array.encrypt_block(block),
+            by_bytes.encrypt_block(block),
+        )
+
+
 def run_padding(label, cipher, block_size):
     """Check mode-dependent padding for lengths around block boundaries."""
     iv = bytes(range(block_size))
@@ -83,6 +112,17 @@ def run_padding(label, cipher, block_size):
             ok &= cipher.decrypt(ct, mode=mode, iv=iv) == pt
         check(f"{label} {mode} is unpadded and length preserving", ok, True)
 
+    check(
+        f"{label} hex/str input is rejected",
+        raises_type_error(lambda: cipher.encrypt("00ff", mode="ECB")),
+        True,
+    )
+    check(
+        f"{label} bytearray input is accepted",
+        cipher.decrypt(cipher.encrypt(bytearray(b"xyz"), mode="ECB"), mode="ECB"),
+        b"xyz",
+    )
+
     short = b"abc"
     check(
         f"{label} unpadded block mode rejects a partial block",
@@ -106,30 +146,31 @@ def main():
     """Exercise all six block modes across every cipher."""
     print("== BlockCipher modes: Blowfish (8-byte block) ==")
     c = Blowfish()
-    c.generate_keys("AABB09182736CCDD")
+    c.generate_keys(bytes.fromhex("AABB09182736CCDD"))
     run_modes("blowfish", c, 8)
 
     print("== BlockCipher modes: Twofish (16-byte block) ==")
     c = Twofish()
-    c.generate_keys("00000000000000000000000000000000")
+    c.generate_keys(bytes.fromhex("00000000000000000000000000000000"))
     run_modes("twofish", c, 16)
 
     print("== BlockCipher modes: AES (16-byte block) ==")
     c = AES()
-    c.generate_keys("000102030405060708090a0b0c0d0e0f")
+    c.generate_keys(bytes.fromhex("000102030405060708090a0b0c0d0e0f"))
     run_modes("aes", c, 16)
 
     print("== BlockCipher modes: Serpent (16-byte block) ==")
     c = Serpent()
-    c.generate_keys(
-        "1111111111111111111111111111111111111111111111111111111111111111"
-    )
+    c.generate_keys(bytes.fromhex("11" * 32))
     run_modes("serpent", c, 16)
 
     print("== BlockCipher modes: DES (8-byte block) ==")
     c = DES()
-    c.generate_keys("AABB09182736CCDD")
+    c.generate_keys(bytes.fromhex("AABB09182736CCDD"))
     run_modes("des", c, 8)
+
+    print("== Key types ==")
+    check_key_types()
 
     print("== Mode-dependent padding ==")
     for label, cipher, block_size in (
@@ -139,7 +180,7 @@ def main():
         ("twofish", Twofish(), 16),
         ("serpent", Serpent(), 16),
     ):
-        cipher.generate_keys("00112233445566778899aabbccddeeff")
+        cipher.generate_keys(bytes.fromhex("00112233445566778899aabbccddeeff"))
         run_padding(label, cipher, block_size)
 
     print()

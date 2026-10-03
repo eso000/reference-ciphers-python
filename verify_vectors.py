@@ -156,7 +156,7 @@ def run(cipher: str) -> Tuple[str, List[str]]:
     reports: List[str] = []
     passed = 0
     for name, key, pt, ct in vecs:
-        make_keys(key)
+        make_keys(bytes.fromhex(key))
         got = enc_block(bytes.fromhex(pt)).hex()
         got_d = dec_block(bytes.fromhex(ct)).hex()
         ok = got.lower() == ct.lower() and got_d.lower() == pt.lower()

@@ -1,7 +1,5 @@
 """Serpent (Anderson, Biham and Knudsen 1998), implemented step by step for teaching."""
 
-from typing import Union
-
 from encryption_base import EncryptionBase
 
 # The Serpent S-box tables (SBOXES) are in the appendix at the end of this file.
@@ -39,30 +37,25 @@ class Serpent(EncryptionBase):
         return r
 
     @staticmethod
-    def _hex_to_words_bitrev(s):
-        """Convert hex string to list of 32-bit words with bit-reversal per byte.
-        Each 8-char chunk (4 bytes) becomes one word."""
+    def _bytes_to_words_bitrev(data: bytes):
+        """Convert bytes to 32-bit words with bit-reversal per byte.
+        Each 4 bytes become one word."""
         out = []
-        for i in range(0, len(s), 8):
-            chunk = s[i : i + 8]
-            if len(chunk) < 8:
-                chunk = chunk.ljust(8, "0")
+        for i in range(0, len(data), 4):
             w = 0
-            for j in range(0, 8, 2):
-                byte = int(chunk[j : j + 2], 16)
+            for byte in data[i : i + 4]:
                 w = (w << 8) | Serpent._bitrev8(byte)
             out.append(w)
         return out
 
     @staticmethod
-    def _words_to_hex_bitrev(words):
-        """Convert list of 32-bit words to hex string with bit-reversal per byte."""
-        out = []
+    def _words_to_bytes_bitrev(words) -> bytes:
+        """Convert 32-bit words to bytes with bit-reversal per byte."""
+        out = bytearray()
         for w in words:
             for shift in (24, 16, 8, 0):
-                byte = (w >> shift) & 0xFF
-                out.append(f"{Serpent._bitrev8(byte):02x}")
-        return "".join(out)
+                out.append(Serpent._bitrev8((w >> shift) & 0xFF))
+        return bytes(out)
 
     def apply_sbox_bit(self, x, n, d=0):
         """Bit-sliced S-box: apply S-box n to four 32-bit bit-planes."""
@@ -425,22 +418,18 @@ class Serpent(EncryptionBase):
             return [r3, r0, r1, r4]
         return x
 
-    def generate_keys(self, key: Union[bytes, str]) -> None:
-        """Expand the 128-bit hex key into 33 round subkeys."""
+    def generate_keys(self, key: bytes) -> None:
+        """Expand a key of up to 32 bytes into 33 round subkeys."""
         # The spec pads short keys by appending a '1' bit, i.e. a byte of
         # 0x01 immediately after the key bytes, then zeros to 256 bits.
         # Expand to 32 bytes.
-        if isinstance(key, bytes):
-            key = key.hex()
+        key = self._as_bytes(key, "key")
         target = 32
-        if len(key) % 2:
-            key += "0"
-        n = len(key) // 2
-        if n > target:
-            key = key[: 2 * target]
-        elif n < target:
-            key = key[: 2 * n] + "01" + "00" * (target - n - 1)
-        w = self._hex_to_words_bitrev(key)
+        if len(key) > target:
+            key = key[:target]
+        elif len(key) < target:
+            key = key + b"\x01" + b"\x00" * (target - len(key) - 1)
+        w = self._bytes_to_words_bitrev(key)
         for i in range(8, 140):
             wi = w[i - 8] ^ w[i - 5] ^ w[i - 3] ^ w[i - 1] ^ PHI ^ self._bitrev32(i - 8)
             wi = self.rotr(wi, 11, 32)
@@ -497,7 +486,7 @@ class Serpent(EncryptionBase):
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 128-bit block given as bytes."""
-        x = self._hex_to_words_bitrev(plaintext.hex())
+        x = self._bytes_to_words_bitrev(plaintext)
         for r in range(32):
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
             x = self._sbox(x, r % 8)
@@ -505,11 +494,11 @@ class Serpent(EncryptionBase):
                 break
             x = self.lt(x)
         x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
-        return bytes.fromhex(self._words_to_hex_bitrev(x))
+        return self._words_to_bytes_bitrev(x)
 
     def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 128-bit block given as bytes."""
-        x = self._hex_to_words_bitrev(ciphertext.hex())
+        x = self._bytes_to_words_bitrev(ciphertext)
         x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
         x = self._sbox(x, 31 % 8, d=1)
         x = [x[i] ^ self.subkeys[31][i] for i in range(4)]
@@ -517,7 +506,7 @@ class Serpent(EncryptionBase):
             x = self.lt_inverse(x)
             x = self._sbox(x, r % 8, d=1)
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
-        return bytes.fromhex(self._words_to_hex_bitrev(x))
+        return self._words_to_bytes_bitrev(x)
 
 #
 # ---- Serpent data tables (appendix) ----

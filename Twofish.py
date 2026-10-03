@@ -1,6 +1,6 @@
 """Twofish (Schneier et al., 1998), implemented step by step for teaching."""
 
-from typing import List, Union
+from typing import List
 
 from encryption_base import EncryptionBase
 
@@ -124,17 +124,16 @@ class Twofish(EncryptionBase):
         num2 = (a + 2 * b) % (2**32)
         return num1, num2
 
-    def generate_keys(self, key: Union[bytes, str]) -> None:
+    def generate_keys(self, key: bytes) -> None:
         """Derive subkeys and key S-boxes.
 
-        The key is read as hex bytes; each four-byte group forms a 32-bit
+        The key is 16, 24 or 32 bytes (shorter keys are zero-padded up to the
+        next size); each four-byte group forms a 32-bit
         word with its first byte most significant (big-endian), matching the
         Twofish key expansion. Words for the rounds themselves are
         little-endian (see bytes_to_words_le).
         """
-        if isinstance(key, str):
-            key = self.hex_to_bytes(key)
-        key = self.hex_to_bytes(self.pad_key_hex(key.hex(), [32, 48, 64]))
+        key = self.pad_key(self._as_bytes(key, "key"), [16, 24, 32])
         m = list(key)
         s = []
         for t in range(0, len(m), 8):

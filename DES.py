@@ -1,6 +1,5 @@
 """DES and 3DES (FIPS 46-3), implemented step by step for teaching."""
 
-from typing import Union
 from encryption_base import EncryptionBase
 
 # DES data tables (IP, FP, E, SBOXES, PC1, PC2, P, SPBOXES) and the
@@ -101,10 +100,9 @@ class DES(EncryptionBase):
     def get_block_size(self) -> int:
         return 8  # 64 bits = 8 bytes
 
-    def generate_keys(self, key: Union[bytes, str]) -> None:
+    def generate_keys(self, key: bytes) -> None:
         """Derive the 16 round subkeys from a 64-bit (8 byte) key."""
-        if isinstance(key, str):
-            key = self.hex_to_bytes(key)
+        key = self._as_bytes(key, "key")
         if len(key) < 8:
             key = self.pad(key, 8, "0")
         key_bits = self.permutate_int(int.from_bytes(key, "big"), PC1, width=64)
@@ -192,10 +190,9 @@ class TripleDES(EncryptionBase):
         pt = self.des2.encrypt_block(pt)
         return self.des1.decrypt_block(pt)
 
-    def generate_keys(self, key: Union[bytes, str]) -> None:
+    def generate_keys(self, key: bytes) -> None:
         """Derive the 16 round subkeys from a 192-bit (24 byte) key."""
-        if isinstance(key, str):
-            key = self.hex_to_bytes(key)
+        key = self._as_bytes(key, "key")
         if len(key) < 24:
             key = self.pad(key, 24, "0")
         self.des1.generate_keys(key[0:8])

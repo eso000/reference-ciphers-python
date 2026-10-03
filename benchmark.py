@@ -18,10 +18,10 @@ CIPHERS = [
 ]
 
 B_SIZE = 4000
-MSG = "0" * B_SIZE
+MSG = bytes(B_SIZE)
 
 for obj, key in CIPHERS:
-    obj.generate_keys(key)
+    obj.generate_keys(bytes.fromhex(key))
 
 for i in range(4):
     print("ECB:")
