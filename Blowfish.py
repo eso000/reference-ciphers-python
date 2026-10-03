@@ -5,7 +5,7 @@ from encryption_base import EncryptionBase
 # Blowfish data tables (PBOX, SBOXES) are in the appendix at the end of this file.
 
 class Blowfish(EncryptionBase):
-    """Blowfish cipher; 64-bit blocks with variable-length keys (1-56 bytes)."""
+    """Blowfish cipher; 64-bit blocks with variable-length keys (4-56 bytes)."""
 
     def __init__(self):
         """Start with empty per-instance S-box and key-schedule state."""
@@ -18,12 +18,12 @@ class Blowfish(EncryptionBase):
     def generate_keys(self, key: bytes) -> None:
         """Build the key schedule: key-XOR the P-array, then re-encrypt P and the S-boxes.
 
-        Blowfish accepts keys of 1 to 56 bytes; shorter keys are used as-is and
-        the key bytes are cycled when filling the 18 32-bit P-array words.
+        Blowfish accepts keys of 4 to 56 bytes (32 to 448 bits, as specified); the
+        key bytes are cycled when filling the 18 32-bit P-array words.
         """
         key = self._as_bytes(key, "key")
-        if len(key) < 1 or len(key) > 56:
-            raise ValueError("Blowfish key must be 1 to 56 bytes")
+        if not 4 <= len(key) <= 56:
+            raise ValueError(f"Blowfish key must be 4 to 56 bytes, got {len(key)}")
 
         keys = []
         bit_len = len(key) * 8
@@ -64,7 +64,7 @@ class Blowfish(EncryptionBase):
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 64-bit block given as 8 bytes."""
-        block = int.from_bytes(plaintext[:8], "big")
+        block = int.from_bytes(self._checked_block(plaintext), "big")
         left = block >> 32
         right = block & 0xFFFFFFFF
 
@@ -81,7 +81,7 @@ class Blowfish(EncryptionBase):
 
     def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 64-bit block given as 8 bytes."""
-        block = int.from_bytes(ciphertext[:8], "big")
+        block = int.from_bytes(self._checked_block(ciphertext), "big")
         left = block >> 32
         right = block & 0xFFFFFFFF
 

@@ -90,7 +90,7 @@ def run_mode_kats(kats, mode, label):
     for name, key, ct in kats:
         c = AES()
         c.generate_keys(bytes.fromhex(key))
-        iv = bytes.fromhex(SP800_IV)
+        iv = bytes.fromhex(SP800_IV) if mode != "ECB" else b""
         got = c.encrypt(bytes.fromhex(SP800_PT), mode=mode, padding="", iv=iv)
         check(f"{label} {name.lower()} encrypt", got.hex(), ct)
         got = c.decrypt(bytes.fromhex(ct), mode=mode, padding="", iv=iv)

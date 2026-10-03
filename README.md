@@ -52,14 +52,27 @@ c.encrypt_block(bytes.fromhex("00112233445566778899aabbccddeeff")).hex()
 ```
 
 Keys, plaintext, ciphertext and IVs are all `bytes` (a `str`, including a hex
-string, raises `TypeError`). `encrypt` / `decrypt` handle arbitrary-length data. Defaults: CBC mode with ISO 7816-4 padding.
+string, raises `TypeError`). `encrypt` / `decrypt` handle arbitrary-length data.
+Default mode is CBC with ISO 7816-4 padding.
 
 ```python
-iv = bytes(16)
+import os
+
+iv = os.urandom(16)   # fresh, unpredictable, one block long
 ct = c.encrypt(b"attack at dawn", mode="CBC", padding="ISO 7816-4", iv=iv)
 pt = c.decrypt(ct, mode="CBC", padding="ISO 7816-4", iv=iv)
 # b'attack at dawn'
 ```
+
+Lengths are checked strictly and never silently adjusted; a wrong length raises
+`ValueError`:
+
+- **Keys:** AES, Twofish and Serpent take exactly 16, 24 or 32 bytes (Serpent
+  applies the spec's `0x01` padding to 16/24-byte keys internally), DES 8,
+  3DES 24, Blowfish 4–56.
+- **Blocks:** `encrypt_block` / `decrypt_block` take exactly one block.
+- **IVs:** every mode except ECB needs an IV of exactly one block (for CTR, the
+  initial counter block). ECB rejects an IV. There is no default IV.
 
 ## Modes and padding
 

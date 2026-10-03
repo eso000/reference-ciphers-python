@@ -155,21 +155,16 @@ def main():
         check(f"serpent alt==table {mode.lower()} decrypt",
               a.decrypt(ct_a, mode=mode, iv=iv), b.decrypt(ct_a, mode=mode, iv=iv))
 
-    print("== key padding/truncation edge cases ==")
+    print("== short keys get the spec 0x01 pad ==")
     for alt in (True, False):
-        short = Serpent(use_alt=alt)
-        padded = Serpent(use_alt=alt)
-        short.generate_keys(b"\x00")
-        padded.generate_keys(b"\x00\x01" + bytes(30))
-        check(f"serpent short key gets the spec 0x01 pad (alt={alt})",
-              short.subkeys, padded.subkeys)
-        z = b"\x1f" * 36
-        long = Serpent(use_alt=alt)
-        trunc = Serpent(use_alt=alt)
-        long.generate_keys(z)
-        trunc.generate_keys(z[:32])
-        check(f"serpent 288-bit key truncated to 256 bits (alt={alt})",
-              long.subkeys, trunc.subkeys)
+        for size in (16, 24):
+            key = bytes(range(1, size + 1))
+            short = Serpent(use_alt=alt)
+            padded = Serpent(use_alt=alt)
+            short.generate_keys(key)
+            padded.generate_keys(key + b"\x01" + bytes(31 - size))
+            check(f"serpent {size * 8}-bit key == explicit 0x01-padded 256-bit key (alt={alt})",
+                  short.subkeys, padded.subkeys)
 
     print("== randomized round trip and alt agreement ==")
     random.seed(42)

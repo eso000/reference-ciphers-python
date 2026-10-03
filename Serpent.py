@@ -419,15 +419,12 @@ class Serpent(EncryptionBase):
         return x
 
     def generate_keys(self, key: bytes) -> None:
-        """Expand a key of up to 32 bytes into 33 round subkeys."""
-        # The spec pads short keys by appending a '1' bit, i.e. a byte of
-        # 0x01 immediately after the key bytes, then zeros to 256 bits.
-        # Expand to 32 bytes.
-        key = self._as_bytes(key, "key")
+        """Expand a 16, 24 or 32 byte key into 33 round subkeys."""
+        # The spec pads keys shorter than 256 bits by appending a '1' bit, i.e.
+        # a byte of 0x01 immediately after the key bytes, then zeros to 256 bits.
+        key = self._checked_key(key, (16, 24, 32), "Serpent")
         target = 32
-        if len(key) > target:
-            key = key[:target]
-        elif len(key) < target:
+        if len(key) < target:
             key = key + b"\x01" + b"\x00" * (target - len(key) - 1)
         w = self._bytes_to_words_bitrev(key)
         for i in range(8, 140):
@@ -486,7 +483,7 @@ class Serpent(EncryptionBase):
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 128-bit block given as bytes."""
-        x = self._bytes_to_words_bitrev(plaintext)
+        x = self._bytes_to_words_bitrev(self._checked_block(plaintext))
         for r in range(32):
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
             x = self._sbox(x, r % 8)
@@ -498,7 +495,7 @@ class Serpent(EncryptionBase):
 
     def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 128-bit block given as bytes."""
-        x = self._bytes_to_words_bitrev(ciphertext)
+        x = self._bytes_to_words_bitrev(self._checked_block(ciphertext))
         x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
         x = self._sbox(x, 31 % 8, d=1)
         x = [x[i] ^ self.subkeys[31][i] for i in range(4)]

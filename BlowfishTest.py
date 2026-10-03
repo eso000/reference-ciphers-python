@@ -1,8 +1,10 @@
 """Blowfish known-answer, block-mode, and padding tests.
 
-Vectors: Schneier's full 34-entry official ECB set plus the 24 official
-``set_key`` vectors covering 1- to 24-byte keys (the key schedules cycle
-short keys), and the repository's own KAT.
+Vectors: Schneier's full 34-entry official ECB set plus the official
+``set_key`` vectors for 4- to 24-byte keys (the key schedule cycles short
+keys), and the repository's own KAT. Keys under 4 bytes (32 bits) are outside
+the specification and are rejected, so the 1- to 3-byte ``set_key`` vectors
+are not used.
 """
 
 from Blowfish import Blowfish
@@ -69,9 +71,6 @@ OFFICIAL = [
 ]
 
 SET_KEY = [
-    ("F0", "F9AD597C49DB005E"),
-    ("F0E1", "E91D21C1D961A6D6"),
-    ("F0E1D2", "E9C2B70A1BC65CF3"),
     ("F0E1D2C3", "BE1E639408640F05"),
     ("F0E1D2C3B4", "B39E44481BDB1E6E"),
     ("F0E1D2C3B4A5", "9457AA83B1928C0D"),
@@ -108,7 +107,7 @@ def run_official():
 
 
 def run_set_key():
-    """Run the 24 set_key vectors covering 1- to 24-byte keys."""
+    """Run the 21 set_key vectors covering 4- to 24-byte keys."""
     for key, ct in SET_KEY:
         c = Blowfish()
         c.generate_keys(bytes.fromhex(key))
@@ -164,7 +163,7 @@ def main():
           raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 
     print("== standard key schedule (non-aligned key lengths) ==")
-    for label, key in (("3-byte", "AABBCC"),
+    for label, key in (("4-byte (min)", "AABBCCDD"),
                        ("56-byte (max)", "".join(f"{((i * 37) % 256):02x}" for i in range(56)))):
         c = Blowfish()
         c.generate_keys(bytes.fromhex(key))
@@ -176,6 +175,8 @@ def main():
 
     print("== key length validation ==")
     for label, key in (("empty key rejected", ""),
+                       ("1-byte key rejected", "F0"),
+                       ("3-byte key rejected", "F0E1D2"),
                        ("57-byte key rejected", "".join(f"{i % 256:02x}" for i in range(57)))):
         try:
             Blowfish().generate_keys(bytes.fromhex(key))

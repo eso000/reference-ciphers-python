@@ -123,37 +123,6 @@ class EncryptionBase:
         """Placeholder: single-block decryption, overridden by each cipher."""
         return ciphertext
 
-    def pad(self, data: bytes, length: int, typ: str = "bit") -> bytes:
-        """Pad ``data`` up to ``length`` bytes using the requested scheme.
-
-        Returns it unchanged when already long enough.
-        """
-        if len(data) == 0:
-            data = b"\x00"
-        shortfall = length - len(data)
-        if shortfall <= 0:
-            return data
-
-        match typ:
-            case "ISO 7816-4" | "bit":
-                # ISO 7816-4 / bit padding: append 0x80 then zeros
-                return data + b"\x80" + b"\x00" * (shortfall - 1)
-            case "TBC":
-                # Trailing bit complement - not common, simple implementation
-                last_bit = data[-1] & 1
-                return data + bytes([last_bit ^ 1]) * shortfall
-            case "byt" | "0":
-                # Zero padding
-                return data + b"\x00" * shortfall
-            case "PKCS":
-                # PKCS#7: pad with byte value = padding length
-                return data + bytes([shortfall]) * shortfall
-            case "ANSI X9.23":
-                # ANSI X9.23: zeros then padding length
-                return data + b"\x00" * (shortfall - 1) + bytes([shortfall])
-            case _:
-                raise ValueError(f"Unknown padding type '{typ}'")
-
     @staticmethod
     def mode_needs_padding(mode: str) -> bool:
         """Return True for modes that only work on whole blocks (ECB, CBC,
@@ -243,14 +212,6 @@ class EncryptionBase:
             case _:
                 raise ValueError(f"Unknown padding type '{padding}'")
 
-    def pad_key(self, key: bytes, sizes: List[int]) -> bytes:
-        """Zero-pad ``key`` to the first allowed ``sizes`` value (in bytes)
-        that fits it, or truncate it to the largest size."""
-        for size in sizes:
-            if len(key) <= size:
-                return key + b"\x00" * (size - len(key))
-        return key[: sizes[-1]]
-
     def get_block_size(self) -> int:
         """Return block size in bytes. Override in subclass."""
         raise NotImplementedError("Subclass must implement get_block_size()")
@@ -262,11 +223,33 @@ class EncryptionBase:
             raise TypeError(f"{name} must be bytes, not str")
         return bytes(value)
 
-    def _start_iv(self, iv: bytes, block_size: int, padding: str) -> bytes:
-        """Return the IV for a chained mode, padded to one block if shorter."""
-        if len(iv) != block_size:
-            return self.pad(iv, block_size, padding)
-        return iv
+    @classmethod
+    def _checked_key(cls, key: bytes, sizes: tuple, label: str) -> bytes:
+        """Return ``key`` as bytes, requiring its length to be in ``sizes``."""
+        key = cls._as_bytes(key, "key")
+        if len(key) not in sizes:
+            allowed = ", ".join(str(n) for n in sizes[:-1])
+            allowed = f"{allowed} or {sizes[-1]}" if allowed else str(sizes[-1])
+            raise ValueError(f"{label} key must be {allowed} bytes, got {len(key)}")
+        return key
+
+    def _checked_block(self, data: bytes) -> bytes:
+        """Return ``data`` as bytes, requiring exactly one cipher block."""
+        data = self._as_bytes(data, "block")
+        if len(data) != self.get_block_size():
+            raise ValueError(
+                f"block must be {self.get_block_size()} bytes, got {len(data)}"
+            )
+        return data
+
+    @staticmethod
+    def _check_iv(iv: bytes, block_size: int, mode: str) -> None:
+        """Require a ``block_size``-byte IV for chained modes and none for ECB."""
+        if mode == "ECB":
+            if iv:
+                raise ValueError("ECB mode does not use an IV")
+        elif len(iv) != block_size:
+            raise ValueError(f"{mode} needs a {block_size}-byte IV, got {len(iv)}")
 
     def encrypt(
         self,
@@ -279,8 +262,9 @@ class EncryptionBase:
         CTR) and return the ciphertext bytes.
 
         ECB, CBC and PCBC pad the message per ``padding`` (always, even when
-        block-aligned); CFB, OFB and CTR do not pad. ``iv`` is the IV or, for
-        CTR, the initial counter block.
+        block-aligned); CFB, OFB and CTR do not pad. Every mode except ECB
+        requires an ``iv`` of exactly one block (for CTR, the initial counter
+        block); ECB rejects an IV.
         """
         plaintext = self._as_bytes(plaintext, "plaintext")
         iv = self._as_bytes(iv, "iv")
@@ -289,8 +273,7 @@ class EncryptionBase:
         blocks = [
             plaintext[i : i + block_size] for i in range(0, len(plaintext), block_size)
         ]
-        if mode != "ECB":
-            iv = self._start_iv(iv, block_size, padding)
+        self._check_iv(iv, block_size, mode)
 
         result = bytearray()
         match mode:
@@ -345,8 +328,7 @@ class EncryptionBase:
             ciphertext[i : i + block_size]
             for i in range(0, len(ciphertext), block_size)
         ]
-        if mode != "ECB":
-            iv = self._start_iv(iv, block_size, padding)
+        self._check_iv(iv, block_size, mode)
 
         result = bytearray()
         match mode:
