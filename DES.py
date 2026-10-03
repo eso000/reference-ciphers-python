@@ -102,9 +102,7 @@ class DES(EncryptionBase):
 
     def generate_keys(self, key: bytes) -> None:
         """Derive the 16 round subkeys from a 64-bit (8 byte) key."""
-        key = self._as_bytes(key, "key")
-        if len(key) < 8:
-            key = self.pad(key, 8, "0")
+        key = self._checked_key(key, (8,), "DES")
         key_bits = self.permutate_int(int.from_bytes(key, "big"), PC1, width=64)
         left_key = key_bits >> 28
         right_key = key_bits & 0x0FFFFFFF
@@ -146,7 +144,7 @@ class DES(EncryptionBase):
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 64-bit block given as 8 bytes."""
-        block = self._ip(int.from_bytes(plaintext, "big"))
+        block = self._ip(int.from_bytes(self._checked_block(plaintext), "big"))
         left = block >> 32
         right = block & 0xFFFFFFFF
         for i in range(16):
@@ -157,7 +155,7 @@ class DES(EncryptionBase):
 
     def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 64-bit block given as 8 bytes."""
-        block = self._ip(int.from_bytes(ciphertext, "big"))
+        block = self._ip(int.from_bytes(self._checked_block(ciphertext), "big"))
         left = block >> 32
         right = block & 0xFFFFFFFF
         for i in range(16):
@@ -192,9 +190,7 @@ class TripleDES(EncryptionBase):
 
     def generate_keys(self, key: bytes) -> None:
         """Derive the 16 round subkeys from a 192-bit (24 byte) key."""
-        key = self._as_bytes(key, "key")
-        if len(key) < 24:
-            key = self.pad(key, 24, "0")
+        key = self._checked_key(key, (24,), "3DES")
         self.des1.generate_keys(key[0:8])
         self.des2.generate_keys(key[8:16])
         self.des3.generate_keys(key[16:24])

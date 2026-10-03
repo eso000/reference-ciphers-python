@@ -127,13 +127,12 @@ class Twofish(EncryptionBase):
     def generate_keys(self, key: bytes) -> None:
         """Derive subkeys and key S-boxes.
 
-        The key is 16, 24 or 32 bytes (shorter keys are zero-padded up to the
-        next size); each four-byte group forms a 32-bit
+        The key must be exactly 16, 24 or 32 bytes; each four-byte group forms a 32-bit
         word with its first byte most significant (big-endian), matching the
         Twofish key expansion. Words for the rounds themselves are
         little-endian (see bytes_to_words_le).
         """
-        key = self.pad_key(self._as_bytes(key, "key"), [16, 24, 32])
+        key = self._checked_key(key, (16, 24, 32), "Twofish")
         m = list(key)
         s = []
         for t in range(0, len(m), 8):
@@ -261,7 +260,7 @@ class Twofish(EncryptionBase):
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 128-bit block given as 16 bytes."""
-        x = self.bytes_to_words_le(plaintext)
+        x = self.bytes_to_words_le(self._checked_block(plaintext))
         for i in range(4):
             x[i] = x[i] ^ self.subkeys[i]
         for i in range(16):
@@ -289,7 +288,7 @@ class Twofish(EncryptionBase):
 
     def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 128-bit block given as 16 bytes."""
-        x = self.bytes_to_words_le(ciphertext)
+        x = self.bytes_to_words_le(self._checked_block(ciphertext))
         for i in range(4):
             x[i] = x[i] ^ self.subkeys[4 + i]
         for i in range(16):

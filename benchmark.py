@@ -10,7 +10,7 @@ from Twofish import Twofish
 
 CIPHERS = [
     (DES(), "0011223344556677"),
-    (TripleDES(), "00112233445566778899aabbccddeeff00112233445566778899aabb"),
+    (TripleDES(), "00112233445566778899aabbccddeeff0011223344556677"),
     (Blowfish(), "00112233445566778899aabbccddeeff"),
     (AES(), "000102030405060708090a0b0c0d0e0f"),
     (Serpent(), "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
@@ -35,5 +35,5 @@ for i in range(4):
     for obj, _ in CIPHERS:
         print(type(obj), end="\t\t")
         start_time = time.time()
-        obj.encrypt(MSG, mode="CBC")
+        obj.encrypt(MSG, mode="CBC", iv=bytes(obj.get_block_size()))
         print(B_SIZE / 1000 / (time.time() - start_time))

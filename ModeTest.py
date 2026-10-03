@@ -8,7 +8,7 @@ import sys
 
 from AES import AES
 from Blowfish import Blowfish
-from DES import DES
+from DES import DES, TripleDES
 from Serpent import Serpent
 from Twofish import Twofish
 
@@ -29,12 +29,17 @@ def check(name, got, want):
         _FAILS += 1
 
 
+def mode_iv(mode, iv):
+    """ECB takes no IV; every other mode takes the given one."""
+    return b"" if mode == "ECB" else iv
+
+
 def run_modes(label, cipher, block_size):
     """Round-trip a three-block message through every mode for ``cipher``."""
     length = block_size * 3
     pt = bytes((1 + i * 7 + 3) & 0xFF for i in range(length))
     for idx, mode in enumerate(MODES):
-        iv = bytes((0x20 + idx + j) & 0xFF for j in range(block_size))
+        iv = mode_iv(mode, bytes((0x20 + idx + j) & 0xFF for j in range(block_size)))
         ct = cipher.encrypt(pt, mode=mode, padding="", iv=iv)
         check(f"{label} {mode} ciphertext differs from plaintext", ct != pt, True)
         check(
@@ -62,18 +67,86 @@ def raises_type_error(func):
     return False
 
 
+KEY_SIZES = (
+    (AES, (16, 24, 32)),
+    (DES, (8,)),
+    (TripleDES, (24,)),
+    (Blowfish, tuple(range(4, 57))),
+    (Twofish, (16, 24, 32)),
+    (Serpent, (16, 24, 32)),
+)
+
+
+def check_cipher_lengths(cls, valid):
+    """Check that ``cls`` rejects keys, blocks and IVs of the wrong length."""
+    name = cls.__name__.lower()
+
+    def key_rejected(n):
+        return raises_value_error(lambda: cls().generate_keys(bytes(n)))
+
+    bad = [n for n in range(66) if n not in valid]
+    check(f"{name} accepts exactly its valid key sizes",
+          [n for n in valid if not key_rejected(n)], list(valid))
+    check(f"{name} rejects every other key size (0-65 bytes)",
+          [n for n in bad if key_rejected(n)], bad)
+
+    cipher = cls()
+    cipher.generate_keys(bytes(valid[0]))
+    size = cipher.get_block_size()
+    for label, func in (("encrypt_block", cipher.encrypt_block),
+                        ("decrypt_block", cipher.decrypt_block)):
+        wrong = [n for n in (0, size - 1, size + 1, 2 * size)
+                 if not raises_value_error(lambda n=n, f=func: f(bytes(n)))]
+        check(f"{name} {label} rejects a block that is not {size} bytes", wrong, [])
+
+    for mode in MODES:
+        for iv in (b"", bytes(size - 1), bytes(size + 1), bytes(2 * size)):
+            if mode == "ECB" and not iv:
+                continue
+            check(
+                f"{name} {mode} rejects a {len(iv)}-byte IV",
+                raises_value_error(
+                    lambda m=mode, v=iv: cipher.encrypt(bytes(size), mode=m, iv=v)),
+                True,
+            )
+            check(
+                f"{name} {mode} decrypt rejects a {len(iv)}-byte IV",
+                raises_value_error(
+                    lambda m=mode, v=iv: cipher.decrypt(bytes(size), mode=m, iv=v)),
+                True,
+            )
+    check(
+        f"{name} ECB rejects a full-size IV",
+        raises_value_error(
+            lambda: cipher.encrypt(bytes(size), mode="ECB", iv=bytes(size))),
+        True,
+    )
+    check(
+        f"{name} default CBC without an IV is rejected",
+        raises_value_error(lambda: cipher.encrypt(b"data")),
+        True,
+    )
+
+
+def check_lengths():
+    """Keys, blocks and IVs of the wrong length are rejected, never adjusted."""
+    for cls, valid in KEY_SIZES:
+        check_cipher_lengths(cls, valid)
+
+
 def check_key_types():
     """Keys must be bytes-like; str (hex) keys are rejected by every cipher."""
-    for cls in (AES, Blowfish, DES, Serpent, Twofish):
+    for cls, valid in KEY_SIZES:
         name = cls.__name__.lower()
         check(
             f"{name} hex/str key is rejected",
-            raises_type_error(lambda c=cls: c().generate_keys("0011223344556677")),
+            raises_type_error(lambda c=cls: c().generate_keys("00" * 8)),
             True,
         )
+        key = bytes(range(valid[0]))
         by_bytes, by_array = cls(), cls()
-        by_bytes.generate_keys(bytes(range(8)))
-        by_array.generate_keys(bytearray(range(8)))
+        by_bytes.generate_keys(key)
+        by_array.generate_keys(bytearray(key))
         block = bytes(by_bytes.get_block_size())
         check(
             f"{name} bytearray key matches bytes key",
@@ -99,8 +172,9 @@ def run_padding(label, cipher, block_size):
         for scheme in SCHEMES:
             ok, grows = True, True
             for pt in messages:
-                ct = cipher.encrypt(pt, mode=mode, padding=scheme, iv=iv)
-                ok &= cipher.decrypt(ct, mode=mode, padding=scheme, iv=iv) == pt
+                miv = mode_iv(mode, iv)
+                ct = cipher.encrypt(pt, mode=mode, padding=scheme, iv=miv)
+                ok &= cipher.decrypt(ct, mode=mode, padding=scheme, iv=miv) == pt
                 grows &= len(ct) == (len(pt) // block_size + 1) * block_size
             check(f"{label} {mode} {scheme} round trip, always pads", ok and grows, True)
 
@@ -169,18 +243,22 @@ def main():
     c.generate_keys(bytes.fromhex("AABB09182736CCDD"))
     run_modes("des", c, 8)
 
+    print("== Strict key, block and IV lengths ==")
+    check_lengths()
+
     print("== Key types ==")
     check_key_types()
 
     print("== Mode-dependent padding ==")
-    for label, cipher, block_size in (
-        ("blowfish", Blowfish(), 8),
-        ("des", DES(), 8),
-        ("aes", AES(), 16),
-        ("twofish", Twofish(), 16),
-        ("serpent", Serpent(), 16),
+    key = bytes.fromhex("00112233445566778899aabbccddeeff")
+    for label, cipher, block_size, key_len in (
+        ("blowfish", Blowfish(), 8, 16),
+        ("des", DES(), 8, 8),
+        ("aes", AES(), 16, 16),
+        ("twofish", Twofish(), 16, 16),
+        ("serpent", Serpent(), 16, 16),
     ):
-        cipher.generate_keys(bytes.fromhex("00112233445566778899aabbccddeeff"))
+        cipher.generate_keys(key[:key_len])
         run_padding(label, cipher, block_size)
 
     print()

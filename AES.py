@@ -53,9 +53,9 @@ class AES(EncryptionBase):
     def generate_keys(self, key: bytes) -> None:
         """Expand a 128/192/256-bit key into the round-key schedule.
 
-        Shorter keys are zero-padded up to the next valid size.
+        The key must be exactly 16, 24 or 32 bytes.
         """
-        key_bytes = self.pad_key(self._as_bytes(key, "key"), [16, 24, 32])
+        key_bytes = self._checked_key(key, (16, 24, 32), "AES")
         n_words = len(key_bytes) // 4
         rounds = AES_ROUNDS[n_words]
 
@@ -139,7 +139,7 @@ class AES(EncryptionBase):
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 128-bit block given as 16 bytes."""
-        state = list(plaintext)
+        state = list(self._checked_block(plaintext))
         state = self.add_round_key(state, self.subkeys[0])
         for round_key in self.subkeys[1:-1]:
             state = self.sub_bytes(state)
@@ -153,7 +153,7 @@ class AES(EncryptionBase):
 
     def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 128-bit block given as 16 bytes."""
-        state = list(ciphertext)
+        state = list(self._checked_block(ciphertext))
         state = self.add_round_key(state, self.subkeys[-1])
         state = self.inv_shift_rows(state)
         state = self.inv_sub_bytes(state)
