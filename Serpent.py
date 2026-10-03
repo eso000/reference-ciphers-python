@@ -7,9 +7,8 @@ from encryption_base import EncryptionBase
 # The Serpent S-box tables (SBOXES) are in the appendix at the end of this file.
 
 # Golden-ratio constant used by the key schedule (Serpent proposal,
-# Section 3.2). This implementation uses a non-standard value that
-# matches the C++ reference implementation in this repo (which uses
-# bit-reversed byte ordering). The standard value is 0x9E3779B9.
+# Section 3.2). This is the standard value 0x9E3779B9 with its bits reversed
+# (0x9D9EEC79), because this implementation works on bit-reversed words.
 PHI = 2644438137
 
 
@@ -17,9 +16,9 @@ class Serpent(EncryptionBase):
     """Serpent cipher; 128-bit blocks and keys, 32 rounds.
 
     ``use_alt`` selects the S-box implementation: ``True`` (default) uses the
-    word-sliced gate networks in apply_sbox (fast, and byte-for-byte the
-    C++ reference), ``False`` uses the bit-sliced table path apply_sbox_bit
-    driven by the SBOXES appendix. Both produce identical ciphertext.
+    word-sliced gate networks in apply_sbox (fast), ``False`` uses the
+    bit-sliced table path apply_sbox_bit driven by the SBOXES appendix. Both
+    produce identical ciphertext.
     """
 
     def __init__(self, use_alt: bool = True):
@@ -32,7 +31,7 @@ class Serpent(EncryptionBase):
 
     @staticmethod
     def _bitrev8(v):
-        """Reverse bits in an 8-bit value (matches C++ ltb)."""
+        """Reverse bits in an 8-bit value (bit-reversal of one byte)."""
         r = 0
         for _ in range(8):
             r = (r << 1) | (v & 1)
@@ -42,7 +41,7 @@ class Serpent(EncryptionBase):
     @staticmethod
     def _hex_to_words_bitrev(s):
         """Convert hex string to list of 32-bit words with bit-reversal per byte.
-        Matches C++ ltb() on 8-char chunks."""
+        Each 8-char chunk (4 bytes) becomes one word."""
         out = []
         for i in range(0, len(s), 8):
             chunk = s[i : i + 8]
@@ -444,7 +443,7 @@ class Serpent(EncryptionBase):
         w = self._hex_to_words_bitrev(key)
         for i in range(8, 140):
             wi = w[i - 8] ^ w[i - 5] ^ w[i - 3] ^ w[i - 1] ^ PHI ^ self._bitrev32(i - 8)
-            wi = self.rotl(wi, 11, 32)
+            wi = self.rotr(wi, 11, 32)
             w.append(wi)
         sk1 = []
         for i in range(33):
@@ -457,7 +456,7 @@ class Serpent(EncryptionBase):
 
     @staticmethod
     def _bitrev32(v):
-        """Reverse bits in a 32-bit value (matches C++ ltb32)."""
+        """Reverse bits in a 32-bit value (bit-reversal of one word)."""
         r = 0
         for _ in range(32):
             r = (r << 1) | (v & 1)
@@ -466,30 +465,30 @@ class Serpent(EncryptionBase):
 
     def lt(self, x):
         """Linear Transformation (diffusion) applied between rounds."""
-        x[0] = self.rotl(x[0], 13, 32)
-        x[2] = self.rotl(x[2], 3, 32)
+        x[0] = self.rotr(x[0], 13, 32)
+        x[2] = self.rotr(x[2], 3, 32)
         x[1] = x[1] ^ x[0] ^ x[2]
         x[3] = x[3] ^ x[2] ^ (x[0] >> 3)
-        x[1] = self.rotl(x[1], 1, 32)
-        x[3] = self.rotl(x[3], 7, 32)
+        x[1] = self.rotr(x[1], 1, 32)
+        x[3] = self.rotr(x[3], 7, 32)
         x[0] = x[0] ^ x[1] ^ x[3]
         x[2] = x[2] ^ x[3] ^ (x[1] >> 7)
-        x[0] = self.rotl(x[0], 5, 32)
-        x[2] = self.rotl(x[2], 22, 32)
+        x[0] = self.rotr(x[0], 5, 32)
+        x[2] = self.rotr(x[2], 22, 32)
         return x
 
     def lt_inverse(self, x):
         """Inverse Linear Transformation, used by decryption."""
-        x[2] = self.rotr(x[2], 22, 32)
-        x[0] = self.rotr(x[0], 5, 32)
+        x[2] = self.rotl(x[2], 22, 32)
+        x[0] = self.rotl(x[0], 5, 32)
         x[2] = x[2] ^ x[3] ^ (x[1] >> 7)
         x[0] = x[0] ^ x[1] ^ x[3]
-        x[3] = self.rotr(x[3], 7, 32)
-        x[1] = self.rotr(x[1], 1, 32)
+        x[3] = self.rotl(x[3], 7, 32)
+        x[1] = self.rotl(x[1], 1, 32)
         x[3] = x[3] ^ x[2] ^ (x[0] >> 3)
         x[1] = x[1] ^ x[0] ^ x[2]
-        x[2] = self.rotr(x[2], 3, 32)
-        x[0] = self.rotr(x[0], 13, 32)
+        x[2] = self.rotl(x[2], 3, 32)
+        x[0] = self.rotl(x[0], 13, 32)
         return x
 
     def get_block_size(self):

@@ -21,7 +21,7 @@ from typing import Callable, Dict, List, Tuple
 
 from AES import AES
 from Blowfish import Blowfish
-from DES import DES, TrippleDES
+from DES import DES, TripleDES
 from Serpent import Serpent
 from Twofish import Twofish
 
@@ -71,7 +71,7 @@ PROGRAMS = programs()
 
 def get_impl(cipher: str):
     """Return (generate_keys, encrypt_block, decrypt_block) for ``cipher``."""
-    classes = {"AES": AES, "DES": DES, "DES3": TrippleDES,
+    classes = {"AES": AES, "DES": DES, "DES3": TripleDES,
                "Blowfish": Blowfish, "Twofish": Twofish, "Serpent": Serpent}
     obj = classes[cipher]()
     return obj.generate_keys, obj.encrypt_block, obj.decrypt_block

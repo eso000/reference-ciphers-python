@@ -6,7 +6,7 @@ triple DES KATs.
 
 import random
 
-from DES import (DES, TrippleDES, IP, FP, SPBOXES, _build_spboxes,
+from DES import (DES, TripleDES, IP, FP, SPBOXES, _build_spboxes,
                  ip_perm_alt, fp_perm_alt)
 
 _FAILS = 0
@@ -104,7 +104,7 @@ def main():
               b.decrypt_block(bytes.fromhex(pt)))
 
     print("== Triple DES known-answer test ==")
-    c = TrippleDES()
+    c = TripleDES()
     c.generate_keys(DES3_KEY)
     ct = c.encrypt_block(bytes.fromhex("123456ABCD132536"))
     check("3des encrypt", ct.hex(), "e6803bea92016d52")
@@ -131,7 +131,7 @@ def main():
 
     print("== Triple DES ECB/CBC round trip ==")
     for mode in ("ECB", "CBC"):
-        c = TrippleDES()
+        c = TripleDES()
         c.generate_keys(DES3_KEY)
         pt = "".join(f"{0x30 + i:02x}" for i in range(16))
         iv = "1122334455667788" if mode == "CBC" else ""

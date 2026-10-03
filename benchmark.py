@@ -4,13 +4,13 @@ import time
 
 from AES import AES
 from Blowfish import Blowfish
-from DES import DES, TrippleDES
+from DES import DES, TripleDES
 from Serpent import Serpent
 from Twofish import Twofish
 
 CIPHERS = [
     (DES(), "0011223344556677"),
-    (TrippleDES(), "00112233445566778899aabbccddeeff00112233445566778899aabb"),
+    (TripleDES(), "00112233445566778899aabbccddeeff00112233445566778899aabb"),
     (Blowfish(), "00112233445566778899aabbccddeeff"),
     (AES(), "000102030405060708090a0b0c0d0e0f"),
     (Serpent(), "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),

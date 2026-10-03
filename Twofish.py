@@ -59,12 +59,12 @@ class Twofish(EncryptionBase):
         a0 = int(x / 16)
         b0 = int(x % 16)
         a1 = a0 ^ b0
-        b1 = a0 ^ self.rotl(b0, 1, 4)
+        b1 = a0 ^ self.rotr(b0, 1, 4)
         b1 = b1 ^ ((8 * a0) % 16)
         a1 = TQ[i][0][a1]
         b1 = TQ[i][1][b1]
         a2 = a1 ^ b1
-        b2 = a1 ^ self.rotl(b1, 1, 4)
+        b2 = a1 ^ self.rotr(b1, 1, 4)
         b2 = b2 ^ ((8 * a1) % 16)
         a2 = TQ[i][2][a2]
         b2 = TQ[i][3][b2]
@@ -239,9 +239,9 @@ class Twofish(EncryptionBase):
         for i in range(20):
             a = self.h(2 * i * RHO, m_even)
             b = self.h((2 * i + 1) * RHO, m_odd)
-            b = self.rotr(b, 8, 32)
+            b = self.rotl(b, 8, 32)
             a, b = self.pht(a, b)
-            b = self.rotr(b, 9, 32)
+            b = self.rotl(b, 9, 32)
             keys.append(a)
             keys.append(b)
         self.subkeys = keys
@@ -269,13 +269,13 @@ class Twofish(EncryptionBase):
             nl0 = x[0]
             nl1 = x[1]
             x[0] = self.g(x[0])
-            x[1] = self.g(self.rotr(x[1], 8, 32))
+            x[1] = self.g(self.rotl(x[1], 8, 32))
             x[0], x[1] = self.pht(x[0], x[1])
             x[0] = (x[0] + self.subkeys[2 * i + 8]) % (2**32)
             x[1] = (x[1] + self.subkeys[2 * i + 9]) % (2**32)
             x[2] = x[2] ^ x[0]
-            x[2] = self.rotl(x[2], 1, 32)
-            x[3] = self.rotr(x[3], 1, 32)
+            x[2] = self.rotr(x[2], 1, 32)
+            x[3] = self.rotl(x[3], 1, 32)
             x[3] = x[3] ^ x[1]
 
             x[0] = x[2]
@@ -297,14 +297,14 @@ class Twofish(EncryptionBase):
             nl0 = x[0]
             nl1 = x[1]
             x[0] = self.g(x[0])
-            x[1] = self.g(self.rotr(x[1], 8, 32))
+            x[1] = self.g(self.rotl(x[1], 8, 32))
             x[0], x[1] = self.pht(x[0], x[1])
             x[0] = (x[0] + self.subkeys[2 * (15 - i) + 8]) % (2**32)
             x[1] = (x[1] + self.subkeys[2 * (15 - i) + 9]) % (2**32)
-            x[2] = self.rotr(x[2], 1, 32)
+            x[2] = self.rotl(x[2], 1, 32)
             x[2] = x[2] ^ x[0]
             x[3] = x[3] ^ x[1]
-            x[3] = self.rotl(x[3], 1, 32)
+            x[3] = self.rotr(x[3], 1, 32)
 
             x[0] = x[2]
             x[1] = x[3]
