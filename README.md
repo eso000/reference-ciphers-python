@@ -19,9 +19,9 @@ test vectors and, when available, against independent crypto libraries.
 ## Architecture
 
 All ciphers share one abstract base class, `EncryptionBase` in
-`encryption_base.py`. It provides the common building blocks (hex/bin/bytes
-conversion, XOR, bit permutations, rotations, padding) and the block-mode
-`encrypt` / `decrypt`, which take and return `bytes`.
+`encryption_base.py`. It provides the common building blocks (XOR, bit
+permutations, rotations, padding) and the block-mode `encrypt` / `decrypt`,
+which take and return `bytes`.
 
 Each cipher subclasses it and implements four methods:
 
@@ -131,7 +131,7 @@ python3 verify_vectors.py
 ## Project layout
 
 ```
-encryption_base.py   Shared base class: conversions, mode-aware padding, all block modes
+encryption_base.py   Shared base class: XOR/permutation/rotation, mode-aware padding, all block modes
 AES.py               AES implementation
 DES.py               DES and 3DES implementations
 Blowfish.py          Blowfish implementation (includes spec tables)
