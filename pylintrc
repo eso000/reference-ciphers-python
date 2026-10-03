@@ -10,8 +10,9 @@
 #                      block/mode/padding/iv interface as a flat, teachable API.
 #  - too-many-public-methods: EncryptionBase exposes every conversion and
 #                      mode/padding helper as a public, teachable method.
-#  - duplicate-code:   standalone test modules intentionally repeat tiny
-#                      check()/print idioms instead of sharing a helper.
+#  - duplicate-code:   the per-cipher test modules intentionally repeat the
+#                      same small test-method shapes instead of sharing an
+#                      abstract base, so each suite reads standalone.
 
 [BASIC]
 # Module files carry proper-cased cipher names (AES.py, Twofish.py, ...).

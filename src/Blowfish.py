@@ -1,6 +1,6 @@
 """Blowfish (Schneier 1994), implemented step by step for teaching."""
 
-from encryption_base import EncryptionBase
+from .encryption_base import EncryptionBase
 
 # Blowfish data tables (PBOX, SBOXES) are in the appendix at the end of this file.
 
