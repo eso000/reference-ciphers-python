@@ -92,7 +92,7 @@ def check_cipher_lengths(cls, valid):
 
     cipher = cls()
     cipher.generate_keys(bytes(valid[0]))
-    size = cipher.get_block_size()
+    size = cipher.block_size
     for label, func in (("encrypt_block", cipher.encrypt_block),
                         ("decrypt_block", cipher.decrypt_block)):
         wrong = [n for n in (0, size - 1, size + 1, 2 * size)
@@ -147,7 +147,7 @@ def check_key_types():
         by_bytes, by_array = cls(), cls()
         by_bytes.generate_keys(key)
         by_array.generate_keys(bytearray(key))
-        block = bytes(by_bytes.get_block_size())
+        block = bytes(by_bytes.block_size)
         check(
             f"{name} bytearray key matches bytes key",
             by_array.encrypt_block(block),

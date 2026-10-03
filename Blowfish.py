@@ -7,13 +7,12 @@ from encryption_base import EncryptionBase
 class Blowfish(EncryptionBase):
     """Blowfish cipher; 64-bit blocks with variable-length keys (4-56 bytes)."""
 
+    block_size = 8  # 64 bits = 8 bytes
+
     def __init__(self):
         """Start with empty per-instance S-box and key-schedule state."""
         self.sboxes: list[list[int]] = []
         self.subkeys: list[int] = []
-
-    def get_block_size(self) -> int:
-        return 8  # 64 bits = 8 bytes
 
     def generate_keys(self, key: bytes) -> None:
         """Build the key schedule: key-XOR the P-array, then re-encrypt P and the S-boxes.

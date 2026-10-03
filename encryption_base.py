@@ -7,6 +7,8 @@ class EncryptionBase:
     """Base class supplying XOR, bit permutation, rotation and the
     block-mode scaffolding shared by the ciphers."""
 
+    block_size: int  # block size in bytes; hard-coded by each cipher
+
     @staticmethod
     def bitwise_xor_bytes(data1: bytes, data2: bytes) -> bytes:
         """XOR two equal-length byte sequences."""
@@ -133,10 +135,6 @@ class EncryptionBase:
             case _:
                 raise ValueError(f"Unknown padding type '{padding}'")
 
-    def get_block_size(self) -> int:
-        """Return block size in bytes. Override in subclass."""
-        raise NotImplementedError("Subclass must implement get_block_size()")
-
     @staticmethod
     def _as_bytes(value, name: str) -> bytes:
         """Return ``value`` as bytes, rejecting str so hex is never guessed."""
@@ -157,10 +155,8 @@ class EncryptionBase:
     def _checked_block(self, data: bytes) -> bytes:
         """Return ``data`` as bytes, requiring exactly one cipher block."""
         data = self._as_bytes(data, "block")
-        if len(data) != self.get_block_size():
-            raise ValueError(
-                f"block must be {self.get_block_size()} bytes, got {len(data)}"
-            )
+        if len(data) != self.block_size:
+            raise ValueError(f"block must be {self.block_size} bytes, got {len(data)}")
         return data
 
     @staticmethod
@@ -171,6 +167,86 @@ class EncryptionBase:
                 raise ValueError("ECB mode does not use an IV")
         elif len(iv) != block_size:
             raise ValueError(f"{mode} needs a {block_size}-byte IV, got {len(iv)}")
+
+    def _mode_ecb(self, blocks: List[bytes], _iv: bytes, decrypt: bool) -> bytes:
+        """ECB: every block is enciphered on its own, with no chaining."""
+        block_fn = self.decrypt_block if decrypt else self.encrypt_block
+        result = bytearray()
+        for block in blocks:
+            result.extend(block_fn(block))
+        return bytes(result)
+
+    def _mode_cbc(self, blocks: List[bytes], iv: bytes, decrypt: bool) -> bytes:
+        """CBC: XOR with the previous ciphertext block, then encipher.
+
+        Encrypting feeds the ciphertext forward; decrypting feeds the input
+        block forward, because that input *is* the ciphertext.
+        """
+        result = bytearray()
+        if decrypt:
+            for block in blocks:
+                result.extend(self.bitwise_xor_bytes(self.decrypt_block(block), iv))
+                iv = block
+            return bytes(result)
+        for block in blocks:
+            iv = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
+            result.extend(iv)
+        return bytes(result)
+
+    def _mode_pcbc(self, blocks: List[bytes], iv: bytes, decrypt: bool) -> bytes:
+        """PCBC: like CBC, but the chain is XORed with the plaintext too."""
+        result = bytearray()
+        if decrypt:
+            for block in blocks:
+                decrypted = self.bitwise_xor_bytes(self.decrypt_block(block), iv)
+                iv = self.bitwise_xor_bytes(block, decrypted)
+                result.extend(decrypted)
+            return bytes(result)
+        for block in blocks:
+            encrypted = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
+            iv = self.bitwise_xor_bytes(block, encrypted)
+            result.extend(encrypted)
+        return bytes(result)
+
+    def _mode_cfb(self, blocks: List[bytes], iv: bytes, decrypt: bool) -> bytes:
+        """CFB: turn the cipher into a keystream generator and XOR.
+
+        Both directions run the cipher on the IV only. The chaining value is
+        the ciphertext, which is this run's output when encrypting and this
+        run's input when decrypting.
+        """
+        result = bytearray()
+        for block in blocks:
+            out = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
+            result.extend(out)
+            iv = block if decrypt else out
+        return bytes(result)
+
+    def _mode_ofb(self, blocks: List[bytes], iv: bytes) -> bytes:
+        """OFB: XOR with a keystream the cipher generates from the IV alone.
+
+        No ciphertext is ever fed back, so one implementation serves both
+        directions.
+        """
+        result = bytearray()
+        for block in blocks:
+            iv = self.encrypt_block(iv)
+            result.extend(self.bitwise_xor_bytes(block, iv))
+        return bytes(result)
+
+    def _mode_ctr(self, blocks: List[bytes], iv: bytes) -> bytes:
+        """CTR: XOR with the cipher applied to a big-endian counter block.
+
+        Only the counter is fed forward, so one implementation serves both
+        directions.
+        """
+        result = bytearray()
+        counter = int.from_bytes(iv, "big")
+        for block in blocks:
+            keystream = self.encrypt_block(counter.to_bytes(self.block_size, "big"))
+            counter += 1
+            result.extend(self.bitwise_xor_bytes(block, keystream))
+        return bytes(result)
 
     def encrypt(
         self,
@@ -189,42 +265,28 @@ class EncryptionBase:
         """
         plaintext = self._as_bytes(plaintext, "plaintext")
         iv = self._as_bytes(iv, "iv")
-        block_size = self.get_block_size()
+        block_size = self.block_size
         plaintext = self.pad_for_mode(plaintext, block_size, mode, padding)
         blocks = [
             plaintext[i : i + block_size] for i in range(0, len(plaintext), block_size)
         ]
         self._check_iv(iv, block_size, mode)
 
-        result = bytearray()
         match mode:
             case "ECB":
-                for block in blocks:
-                    result.extend(self.encrypt_block(block))
+                return self._mode_ecb(blocks, iv, decrypt=False)
             case "CBC":
-                for block in blocks:
-                    iv = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
-                    result.extend(iv)
+                return self._mode_cbc(blocks, iv, decrypt=False)
             case "PCBC":
-                for block in blocks:
-                    encrypted = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
-                    iv = self.bitwise_xor_bytes(block, encrypted)
-                    result.extend(encrypted)
+                return self._mode_pcbc(blocks, iv, decrypt=False)
             case "CFB":
-                for block in blocks:
-                    iv = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
-                    result.extend(iv)
+                return self._mode_cfb(blocks, iv, decrypt=False)
             case "OFB":
-                for block in blocks:
-                    iv = self.encrypt_block(iv)
-                    result.extend(self.bitwise_xor_bytes(block, iv))
+                return self._mode_ofb(blocks, iv)
             case "CTR":
-                counter = int.from_bytes(iv, "big")
-                for block in blocks:
-                    keystream = self.encrypt_block(counter.to_bytes(block_size, "big"))
-                    counter += 1
-                    result.extend(self.bitwise_xor_bytes(block, keystream))
-        return bytes(result)
+                return self._mode_ctr(blocks, iv)
+            case _:
+                raise ValueError(f"Unknown mode '{mode}'")
 
     def decrypt(
         self,
@@ -240,7 +302,7 @@ class EncryptionBase:
         """
         ciphertext = self._as_bytes(ciphertext, "ciphertext")
         iv = self._as_bytes(iv, "iv")
-        block_size = self.get_block_size()
+        block_size = self.block_size
         if self.mode_needs_padding(mode) and len(ciphertext) % block_size:
             raise ValueError(
                 f"{mode} ciphertext must be a multiple of {block_size} bytes"
@@ -251,32 +313,19 @@ class EncryptionBase:
         ]
         self._check_iv(iv, block_size, mode)
 
-        result = bytearray()
         match mode:
             case "ECB":
-                for block in blocks:
-                    result.extend(self.decrypt_block(block))
+                result = self._mode_ecb(blocks, iv, decrypt=True)
             case "CBC":
-                for block in blocks:
-                    result.extend(self.bitwise_xor_bytes(self.decrypt_block(block), iv))
-                    iv = block
+                result = self._mode_cbc(blocks, iv, decrypt=True)
             case "PCBC":
-                for block in blocks:
-                    decrypted = self.bitwise_xor_bytes(self.decrypt_block(block), iv)
-                    iv = self.bitwise_xor_bytes(block, decrypted)
-                    result.extend(decrypted)
+                result = self._mode_pcbc(blocks, iv, decrypt=True)
             case "CFB":
-                for block in blocks:
-                    result.extend(self.bitwise_xor_bytes(self.encrypt_block(iv), block))
-                    iv = block
+                result = self._mode_cfb(blocks, iv, decrypt=True)
             case "OFB":
-                for block in blocks:
-                    iv = self.encrypt_block(iv)
-                    result.extend(self.bitwise_xor_bytes(block, iv))
+                result = self._mode_ofb(blocks, iv)
             case "CTR":
-                counter = int.from_bytes(iv, "big")
-                for block in blocks:
-                    keystream = self.encrypt_block(counter.to_bytes(block_size, "big"))
-                    counter += 1
-                    result.extend(self.bitwise_xor_bytes(block, keystream))
-        return self.unpad_for_mode(bytes(result), block_size, mode, padding)
+                result = self._mode_ctr(blocks, iv)
+            case _:
+                raise ValueError(f"Unknown mode '{mode}'")
+        return self.unpad_for_mode(result, block_size, mode, padding)

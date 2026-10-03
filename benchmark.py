@@ -35,5 +35,5 @@ for i in range(4):
     for obj, _ in CIPHERS:
         print(type(obj), end="\t\t")
         start_time = time.time()
-        obj.encrypt(MSG, mode="CBC", iv=bytes(obj.get_block_size()))
+        obj.encrypt(MSG, mode="CBC", iv=bytes(obj.block_size))
         print(B_SIZE / 1000 / (time.time() - start_time))

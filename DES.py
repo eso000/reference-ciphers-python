@@ -84,6 +84,8 @@ class DES(EncryptionBase):
     permutate_int table path. Both produce identical ciphertext.
     """
 
+    block_size = 8  # 64 bits = 8 bytes
+
     def __init__(self, use_alt: bool = True):
         self.subkeys: list[int] = []
         self.use_alt = use_alt
@@ -96,9 +98,6 @@ class DES(EncryptionBase):
 
     def _f(self, blk: int, subkey: int) -> int:
         return self.f_alt(blk, subkey) if self.use_alt else self.f(blk, subkey)
-
-    def get_block_size(self) -> int:
-        return 8  # 64 bits = 8 bytes
 
     def generate_keys(self, key: bytes) -> None:
         """Derive the 16 round subkeys from a 64-bit (8 byte) key."""
@@ -168,13 +167,12 @@ class DES(EncryptionBase):
 class TripleDES(EncryptionBase):
     """Three-key triple DES: Encrypt-Decrypt-Encrypt over three DES instances."""
 
+    block_size = 8  # 64 bits = 8 bytes
+
     def __init__(self, use_alt: bool = True):
         self.des1 = DES(use_alt)
         self.des2 = DES(use_alt)
         self.des3 = DES(use_alt)
-
-    def get_block_size(self) -> int:
-        return 8  # 64 bits = 8 bytes
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 64-bit block given as 8 bytes."""
