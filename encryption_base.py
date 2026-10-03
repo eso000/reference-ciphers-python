@@ -1,52 +1,17 @@
-"""Shared conversion and padding helpers for the teaching ciphers."""
+"""Shared arithmetic and padding helpers for the teaching ciphers."""
 
 from typing import List
 
 
 class EncryptionBase:
-    """Base class supplying bytes/hex conversions, XOR, rotation,
-    bit permutation, and block-mode scaffolding shared by the ciphers."""
-
-    @staticmethod
-    def bytes_to_hex(data: bytes) -> str:
-        """Encode bytes as hex string."""
-        return data.hex()
-
-    @staticmethod
-    def hex_to_bytes(hex_str: str) -> bytes:
-        """Decode hex string to bytes."""
-        return bytes.fromhex(hex_str)
-
-    @staticmethod
-    def bytes_to_bin(data: bytes) -> str:
-        """Encode bytes as binary string (8 bits per byte)."""
-        return "".join(f"{b:08b}" for b in data)
-
-    @staticmethod
-    def bin_to_bytes(bin_str: str) -> bytes:
-        """Decode binary string (8 bits per byte) to bytes."""
-        if len(bin_str) % 8 != 0:
-            raise ValueError("Binary string length must be multiple of 8")
-        return bytes(int(bin_str[i : i + 8], 2) for i in range(0, len(bin_str), 8))
+    """Base class supplying XOR, bit permutation, rotation and the
+    block-mode scaffolding shared by the ciphers."""
 
     @staticmethod
     def bitwise_xor_bytes(data1: bytes, data2: bytes) -> bytes:
         """XOR two equal-length byte sequences."""
         min_len = min(len(data1), len(data2))
         return bytes(data1[i] ^ data2[i] for i in range(min_len))
-
-    @staticmethod
-    def bitwise_xor_bin(bin_str1: str, bin_str2: str) -> str:
-        """XOR two equal-length binary strings."""
-        min_len = min(len(bin_str1), len(bin_str2))
-        return "".join(
-            "0" if bin_str1[i] == bin_str2[i] else "1" for i in range(min_len)
-        )
-
-    @staticmethod
-    def permutate_bin(bin_str: str, perm: List[int], start: int = 1) -> str:
-        """Pick bits by the 1-based index list ``perm`` from a binary string."""
-        return "".join(bin_str[i - start] for i in perm)
 
     @staticmethod
     def permutate_int(val: int, perm: List[int], width: int, start: int = 1) -> int:
@@ -60,60 +25,16 @@ class EncryptionBase:
         return out
 
     @staticmethod
-    def permutate_bytes(data: bytes, perm: List[int], start: int = 1) -> bytes:
-        """Pick bytes by the 1-based index list ``perm`` from bytes."""
-        return bytes(data[i - start] for i in perm)
-
-    @staticmethod
-    def rotl_int(val: int, shifts: int, width: int) -> int:
-        """Cyclically rotate ``val`` left by ``shifts`` bits within ``width``."""
-        shifts %= width
-        mask = (1 << width) - 1
-        return ((val << shifts) | (val >> (width - shifts))) & mask
-
-    @staticmethod
     def rotl(val: int, shifts: int, width: int) -> int:
         """Rotate ``val`` left by ``shifts`` bits within ``width`` bits."""
+        shifts %= width
         return ((val << shifts) | (val >> (width - shifts))) % (1 << width)
 
     @staticmethod
     def rotr(val: int, shifts: int, width: int) -> int:
         """Rotate ``val`` right by ``shifts`` bits within ``width`` bits."""
+        shifts %= width
         return ((val >> shifts) | (val << (width - shifts))) % (1 << width)
-
-    @staticmethod
-    def rotl_str(s: str, shifts: int) -> str:
-        """Cyclically rotate a string left by ``shifts`` positions."""
-        shifts %= len(s)
-        return s[shifts:] + s[:shifts]
-
-    @staticmethod
-    def rotr_str(s: str, shifts: int) -> str:
-        """Cyclically rotate a string right by ``shifts`` positions."""
-        shifts %= len(s)
-        return s[-shifts:] + s[:-shifts]
-
-    @staticmethod
-    def rotl_list(lst: List, shifts: int) -> List:
-        """Cyclically rotate a list left by ``shifts`` positions."""
-        shifts %= len(lst)
-        return lst[shifts:] + lst[:shifts]
-
-    @staticmethod
-    def rotr_list(lst: List, shifts: int) -> List:
-        """Cyclically rotate a list right by ``shifts`` positions."""
-        shifts %= len(lst)
-        return lst[-shifts:] + lst[:-shifts]
-
-    @staticmethod
-    def shift_left_bin(bin_str: str, n: int) -> str:
-        """Shift a binary string left by ``n`` bits, zero-filling on the right."""
-        return bin_str[n:] + "0" * n
-
-    @staticmethod
-    def shift_right_bin(bin_str: str, n: int) -> str:
-        """Shift a binary string right by ``n`` bits, zero-filling on the left."""
-        return "0" * n + bin_str[:-n]
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Placeholder: single-block encryption, overridden by each cipher."""

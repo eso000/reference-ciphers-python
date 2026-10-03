@@ -112,8 +112,8 @@ class DES(EncryptionBase):
                 shift = 1
             else:
                 shift = 2
-            left_key = self.rotl_int(left_key, shift, 28)
-            right_key = self.rotl_int(right_key, shift, 28)
+            left_key = self.rotl(left_key, shift, 28)
+            right_key = self.rotl(right_key, shift, 28)
             combined = (left_key << 28) | right_key
             subkeys.append(self.permutate_int(combined, PC2, width=56))
         self.subkeys = subkeys
