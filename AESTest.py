@@ -21,6 +21,15 @@ def check(name, got, want):
         _FAILS += 1
 
 
+def raises_value_error(func):
+    """Return True when calling ``func`` raises ValueError."""
+    try:
+        func()
+    except ValueError:
+        return True
+    return False
+
+
 K128 = "000102030405060708090a0b0c0d0e0f"
 K192 = "000102030405060708090a0b0c0d0e0f1011121314151617"
 K256 = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
@@ -132,8 +141,8 @@ def main():
     check("31 bytes round trip through PKCS padding",
           c.decrypt(ct, mode="ECB", padding="PKCS"), pt)
     ct = c.encrypt("00112233445566778899aabbccddeeff", mode="ECB", padding="")
-    check("invalid padding is not stripped",
-          len(c.decrypt(ct, mode="ECB", padding="PKCS")), 32)
+    check("invalid padding is rejected",
+          raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 
     print("== padding schemes (ECB/CBC round trip) ==")
     pt = "aabbccddeeff00112233"

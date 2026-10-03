@@ -65,7 +65,17 @@ pt = c.decrypt(ct, mode="CBC",
 ## Modes and padding
 
 - Modes: **ECB, CBC, PCBC, CFB, OFB, CTR**.
-- Padding: bit-level zero padding and **ISO 7816-4**, plus unpadding.
+- Padding depends on the mode:
+  - **ECB, CBC, PCBC** work on whole blocks, so the message is always padded,
+    including block-aligned input (a full extra block is added). This makes
+    unpadding unambiguous. Schemes: `PKCS`, `ANSI X9.23`, `ISO 7816-4` (`bit`),
+    `TBC`, and `0`/`byt` zero padding (fills to the block boundary only, so it
+    cannot be removed again). `padding=""` means no padding and requires
+    block-aligned input.
+  - **CFB, OFB, CTR** are keystream modes: no padding, and the ciphertext has
+    exactly the length of the plaintext.
+  - Malformed padding or a ciphertext that is not block-aligned raises
+    `ValueError`.
 - Block-level API (`encrypt_block` / `decrypt_block`) takes exactly one block.
 
 ## Verification
@@ -109,7 +119,7 @@ python3 verify_vectors.py
 ## Project layout
 
 ```
-encryption_base.py   Shared base class: conversions, padding, ECB/CBC modes
+encryption_base.py   Shared base class: conversions, mode-aware padding, all block modes
 AES.py               AES implementation
 DES.py               DES and 3DES implementations
 Blowfish.py          Blowfish implementation (includes spec tables)

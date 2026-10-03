@@ -21,6 +21,15 @@ def check(name, got, want):
         _FAILS += 1
 
 
+def raises_value_error(func):
+    """Return True when calling ``func`` raises ValueError."""
+    try:
+        func()
+    except ValueError:
+        return True
+    return False
+
+
 KATS = [
     ("00000000000000000000000000000000",
      "00000000000000000000000000000000", "9f589f5cf6122c32b6bfec2f2ae8c35a"),
@@ -84,8 +93,8 @@ def main():
     ct = c.encrypt("", mode="ECB", padding="PKCS")
     check("empty input padded to one full block", len(ct), 32)
     ct = c.encrypt("00112233445566778899aabbccddeeff", mode="ECB", padding="")
-    check("invalid padding is not stripped",
-          len(c.decrypt(ct, mode="ECB", padding="PKCS")), 32)
+    check("invalid padding is rejected",
+          raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 
     print()
     print(f"{_FAILS} test(s) failed")
