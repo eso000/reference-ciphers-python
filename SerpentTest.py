@@ -122,7 +122,7 @@ def main():
     for alt in (True, False):
         for name, key, pt, ct in KATS:
             c = Serpent(use_alt=alt)
-            c.generate_keys(key)
+            c.generate_keys(bytes.fromhex(key))
             got = c.encrypt_block(bytes.fromhex(pt))
             check(f"serpent alt={alt} {name} encrypt", got.hex(), ct)
             check(f"serpent alt={alt} {name} decrypt",
@@ -132,8 +132,8 @@ def main():
     for name, key, pt, _ in KATS:
         a = Serpent(use_alt=True)
         b = Serpent(use_alt=False)
-        a.generate_keys(key)
-        b.generate_keys(key)
+        a.generate_keys(bytes.fromhex(key))
+        b.generate_keys(bytes.fromhex(key))
         check(f"serpent alt==table encrypt ({name})",
               a.encrypt_block(bytes.fromhex(pt)),
               b.encrypt_block(bytes.fromhex(pt)))
@@ -145,49 +145,31 @@ def main():
     for mode in ("ECB", "CBC"):
         a = Serpent(use_alt=True)
         b = Serpent(use_alt=False)
-        a.generate_keys(K256)
-        b.generate_keys(K256)
-        pt = "".join(f"{0x10 + i:02x}" for i in range(32))
-        iv = "00000000000000000000000000000000" if mode == "CBC" else ""
+        a.generate_keys(bytes.fromhex(K256))
+        b.generate_keys(bytes.fromhex(K256))
+        pt = bytes(0x10 + i for i in range(32))
+        iv = bytes(16) if mode == "CBC" else b""
         ct_a = a.encrypt(pt, mode=mode, iv=iv)
         ct_b = b.encrypt(pt, mode=mode, iv=iv)
         check(f"serpent alt==table {mode.lower()} encrypt", ct_a, ct_b)
         check(f"serpent alt==table {mode.lower()} decrypt",
               a.decrypt(ct_a, mode=mode, iv=iv), b.decrypt(ct_a, mode=mode, iv=iv))
 
-    print("== bytes key == hex string key ==")
-    for name, key, pt, _ in KATS:
-        for alt in (True, False):
-            a = Serpent(use_alt=alt)
-            b = Serpent(use_alt=alt)
-            a.generate_keys(key)
-            b.generate_keys(bytes.fromhex(key))
-            check(f"serpent bytes==hex {name} alt={alt}",
-                  a.encrypt_block(bytes.fromhex(pt)),
-                  b.encrypt_block(bytes.fromhex(pt)))
-    s = Serpent()
-    s.generate_keys(b"\x00")
-    t = Serpent()
-    t.generate_keys("00")
-    check("1-byte bytes key == 1-byte hex key (spec 0x01 pad path)",
-          s.encrypt_block(bytes.fromhex("00000000000000000000000000000000")),
-          t.encrypt_block(bytes.fromhex("00000000000000000000000000000000")))
-
     print("== key padding/truncation edge cases ==")
     for alt in (True, False):
-        o = Serpent(use_alt=alt)
-        e = Serpent(use_alt=alt)
-        o.generate_keys("800")
-        e.generate_keys("8000")
-        check(f"serpent odd-length hex key == padded even (alt={alt})",
-              o.subkeys, e.subkeys)
-        z = "1f" * 36
-        long = Serpent(use_alt=alt)
         short = Serpent(use_alt=alt)
+        padded = Serpent(use_alt=alt)
+        short.generate_keys(b"\x00")
+        padded.generate_keys(b"\x00\x01" + bytes(30))
+        check(f"serpent short key gets the spec 0x01 pad (alt={alt})",
+              short.subkeys, padded.subkeys)
+        z = b"\x1f" * 36
+        long = Serpent(use_alt=alt)
+        trunc = Serpent(use_alt=alt)
         long.generate_keys(z)
-        short.generate_keys(z[:64])
+        trunc.generate_keys(z[:32])
         check(f"serpent 288-bit key truncated to 256 bits (alt={alt})",
-              long.subkeys, short.subkeys)
+              long.subkeys, trunc.subkeys)
 
     print("== randomized round trip and alt agreement ==")
     random.seed(42)
@@ -200,15 +182,15 @@ def main():
         pt = bytes(random.randrange(256) for _ in range(16))
         for alt in (True, False):
             c = Serpent(use_alt=alt)
-            c.generate_keys(key)
+            c.generate_keys(bytes.fromhex(key))
             ct = c.encrypt_block(pt)
             rt_total += 1
             if c.decrypt_block(ct) == pt:
                 rt_ok += 1
         a = Serpent(use_alt=True)
         b = Serpent(use_alt=False)
-        a.generate_keys(key)
-        b.generate_keys(key)
+        a.generate_keys(bytes.fromhex(key))
+        b.generate_keys(bytes.fromhex(key))
         alt_total += 1
         if a.encrypt_block(pt) == b.encrypt_block(pt):
             alt_ok += 1
@@ -218,17 +200,17 @@ def main():
 
     print("== ECB multi-block round trip ==")
     c = Serpent()
-    c.generate_keys(K256)
-    pt = "".join(f"{0x10 + i:02x}" for i in range(32))
+    c.generate_keys(bytes.fromhex(K256))
+    pt = bytes(0x10 + i for i in range(32))
     ct = c.encrypt(pt, mode="ECB")
     check("ecb ciphertext differs from plaintext", ct != pt, True)
     check("ecb encrypt+decrypt restores plaintext", c.decrypt(ct, mode="ECB"), pt)
 
     print("== CBC multi-block round trip ==")
     c = Serpent()
-    c.generate_keys("8000000000000000000000000000000000000000000000000000000000000000")
-    pt = "".join(f"{0xA0 + i:02x}" for i in range(32))
-    iv = "00000000000000000000000000000000"
+    c.generate_keys(bytes.fromhex("80" + "00" * 31))
+    pt = bytes(0xA0 + i for i in range(32))
+    iv = bytes(16)
     ct = c.encrypt(pt, mode="CBC", iv=iv)
     check("cbc ciphertext differs from plaintext", ct != pt, True)
     check("cbc encrypt+decrypt restores plaintext",
@@ -236,17 +218,17 @@ def main():
 
     print("== PKCS#7 padding ==")
     c = Serpent()
-    c.generate_keys(K256)
-    pt = "00112233445566778899aabbcc"
+    c.generate_keys(bytes.fromhex(K256))
+    pt = bytes.fromhex("00112233445566778899aabbcc")
     ct = c.encrypt(pt, mode="ECB", padding="PKCS")
-    check("13-byte input padded to one block", len(ct), 32)
+    check("13-byte input padded to one block", len(ct), 16)
     check("13-byte input round trip through PKCS padding",
           c.decrypt(ct, mode="ECB", padding="PKCS"), pt)
     check("2 bytes padded to one block",
-          len(c.encrypt("ABCD", mode="ECB", padding="PKCS")), 32)
-    ct = c.encrypt("", mode="ECB", padding="PKCS")
-    check("empty input padded to one full block", len(ct), 32)
-    ct = c.encrypt("00112233445566778899aabbccddeeff", mode="ECB", padding="")
+          len(c.encrypt(b"\xab\xcd", mode="ECB", padding="PKCS")), 16)
+    ct = c.encrypt(b"", mode="ECB", padding="PKCS")
+    check("empty input padded to one full block", len(ct), 16)
+    ct = c.encrypt(bytes(range(16)), mode="ECB", padding="")
     check("invalid padding is rejected",
           raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 

@@ -1,6 +1,6 @@
 """Shared conversion and padding helpers for the teaching ciphers."""
 
-from typing import List, Union
+from typing import List
 
 
 class EncryptionBase:
@@ -243,98 +243,100 @@ class EncryptionBase:
             case _:
                 raise ValueError(f"Unknown padding type '{padding}'")
 
-    def pad_key_hex(self, key: str, sizes: List[int]) -> str:
-        """Pad a hex key to the first allowed ``sizes`` value (in hex characters)
+    def pad_key(self, key: bytes, sizes: List[int]) -> bytes:
+        """Zero-pad ``key`` to the first allowed ``sizes`` value (in bytes)
         that fits it, or truncate it to the largest size."""
         for size in sizes:
             if len(key) <= size:
-                return self.pad(bytes.fromhex(key), size // 2, "0").hex()
+                return key + b"\x00" * (size - len(key))
         return key[: sizes[-1]]
 
-    def encrypt_mode(
+    def get_block_size(self) -> int:
+        """Return block size in bytes. Override in subclass."""
+        raise NotImplementedError("Subclass must implement get_block_size()")
+
+    @staticmethod
+    def _as_bytes(value, name: str) -> bytes:
+        """Return ``value`` as bytes, rejecting str so hex is never guessed."""
+        if isinstance(value, str):
+            raise TypeError(f"{name} must be bytes, not str")
+        return bytes(value)
+
+    def _start_iv(self, iv: bytes, block_size: int, padding: str) -> bytes:
+        """Return the IV for a chained mode, padded to one block if shorter."""
+        if len(iv) != block_size:
+            return self.pad(iv, block_size, padding)
+        return iv
+
+    def encrypt(
         self,
-        block_size: int,
         plaintext: bytes,
         mode: str = "CBC",
-        padding: str = "",
+        padding: str = "ISO 7816-4",
         iv: bytes = b"",
     ) -> bytes:
-        """Split the plaintext into blocks and encrypt them in the
-        requested mode. Block size is in bytes. Block modes (ECB, CBC, PCBC) are
-        padded per ``padding``; CFB, OFB and CTR are not padded."""
+        """Encrypt ``plaintext`` bytes in ``mode`` (ECB, CBC, PCBC, CFB, OFB or
+        CTR) and return the ciphertext bytes.
+
+        ECB, CBC and PCBC pad the message per ``padding`` (always, even when
+        block-aligned); CFB, OFB and CTR do not pad. ``iv`` is the IV or, for
+        CTR, the initial counter block.
+        """
+        plaintext = self._as_bytes(plaintext, "plaintext")
+        iv = self._as_bytes(iv, "iv")
+        block_size = self.get_block_size()
         plaintext = self.pad_for_mode(plaintext, block_size, mode, padding)
         blocks = [
             plaintext[i : i + block_size] for i in range(0, len(plaintext), block_size)
         ]
+        if mode != "ECB":
+            iv = self._start_iv(iv, block_size, padding)
 
+        result = bytearray()
         match mode:
             case "ECB":
-                result = bytearray()
                 for block in blocks:
                     result.extend(self.encrypt_block(block))
-                return bytes(result)
             case "CBC":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 for block in blocks:
-                    xored = self.bitwise_xor_bytes(block, iv)
-                    encrypted = self.encrypt_block(xored)
-                    iv = encrypted
-                    result.extend(encrypted)
-                return bytes(result)
+                    iv = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
+                    result.extend(iv)
             case "PCBC":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 for block in blocks:
                     encrypted = self.encrypt_block(self.bitwise_xor_bytes(block, iv))
                     iv = self.bitwise_xor_bytes(block, encrypted)
                     result.extend(encrypted)
-                return bytes(result)
             case "CFB":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 for block in blocks:
-                    encrypted = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
-                    iv = encrypted
-                    result.extend(encrypted)
-                return bytes(result)
+                    iv = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
+                    result.extend(iv)
             case "OFB":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 for block in blocks:
                     iv = self.encrypt_block(iv)
                     result.extend(self.bitwise_xor_bytes(block, iv))
-                return bytes(result)
             case "CTR":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 counter = int.from_bytes(iv, "big")
                 for block in blocks:
-                    keystream = self.encrypt_block(
-                        counter.to_bytes(block_size, "big")
-                    )
+                    keystream = self.encrypt_block(counter.to_bytes(block_size, "big"))
                     counter += 1
                     result.extend(self.bitwise_xor_bytes(block, keystream))
-                return bytes(result)
-            case _:
-                raise ValueError(f"Unknown mode '{mode}'")
+        return bytes(result)
 
-    def decrypt_mode(
+    def decrypt(
         self,
-        block_size: int,
         ciphertext: bytes,
         mode: str = "CBC",
-        padding: str = "",
+        padding: str = "ISO 7816-4",
         iv: bytes = b"",
     ) -> bytes:
-        """Split the ciphertext into blocks and decrypt them in the
-        requested mode. Block size is in bytes. Block modes (ECB, CBC, PCBC) are
-        padded per ``padding``; CFB, OFB and CTR are not padded."""
+        """Decrypt ``ciphertext`` bytes in ``mode`` and return the plaintext.
+
+        Mirrors :meth:`encrypt`: padding is removed for ECB, CBC and PCBC and
+        malformed padding raises ``ValueError``; CFB, OFB and CTR are unpadded.
+        """
+        ciphertext = self._as_bytes(ciphertext, "ciphertext")
+        iv = self._as_bytes(iv, "iv")
+        block_size = self.get_block_size()
         if self.mode_needs_padding(mode) and len(ciphertext) % block_size:
             raise ValueError(
                 f"{mode} ciphertext must be a multiple of {block_size} bytes"
@@ -343,119 +345,35 @@ class EncryptionBase:
             ciphertext[i : i + block_size]
             for i in range(0, len(ciphertext), block_size)
         ]
+        if mode != "ECB":
+            iv = self._start_iv(iv, block_size, padding)
+
+        result = bytearray()
         match mode:
             case "ECB":
-                result = bytearray()
                 for block in blocks:
                     result.extend(self.decrypt_block(block))
-                return self.unpad_for_mode(bytes(result), block_size, mode, padding)
             case "CBC":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 for block in blocks:
-                    decrypted = self.decrypt_block(block)
-                    xored = self.bitwise_xor_bytes(decrypted, iv)
+                    result.extend(self.bitwise_xor_bytes(self.decrypt_block(block), iv))
                     iv = block
-                    result.extend(xored)
-                return self.unpad_for_mode(bytes(result), block_size, mode, padding)
             case "PCBC":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 for block in blocks:
                     decrypted = self.bitwise_xor_bytes(self.decrypt_block(block), iv)
                     iv = self.bitwise_xor_bytes(block, decrypted)
                     result.extend(decrypted)
-                return self.unpad_for_mode(bytes(result), block_size, mode, padding)
             case "CFB":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 for block in blocks:
-                    decrypted = self.bitwise_xor_bytes(self.encrypt_block(iv), block)
+                    result.extend(self.bitwise_xor_bytes(self.encrypt_block(iv), block))
                     iv = block
-                    result.extend(decrypted)
-                return self.unpad_for_mode(bytes(result), block_size, mode, padding)
             case "OFB":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 for block in blocks:
                     iv = self.encrypt_block(iv)
                     result.extend(self.bitwise_xor_bytes(block, iv))
-                return self.unpad_for_mode(bytes(result), block_size, mode, padding)
             case "CTR":
-                result = bytearray()
-                if len(iv) != block_size:
-                    iv = self.pad(iv, block_size, padding)
                 counter = int.from_bytes(iv, "big")
                 for block in blocks:
-                    keystream = self.encrypt_block(
-                        counter.to_bytes(block_size, "big")
-                    )
+                    keystream = self.encrypt_block(counter.to_bytes(block_size, "big"))
                     counter += 1
                     result.extend(self.bitwise_xor_bytes(block, keystream))
-                return self.unpad_for_mode(bytes(result), block_size, mode, padding)
-            case _:
-                raise ValueError(f"Unknown mode '{mode}'")
-
-    def encrypt_hex(
-        self, plaintext: str, mode: str = "CBC", padding: str = "", iv: str = ""
-    ) -> str:
-        """Encrypt a hex plaintext string, returning hex ciphertext."""
-        pt_bytes = self.hex_to_bytes(plaintext)
-        iv_bytes = self.hex_to_bytes(iv) if iv else b""
-        block_size = self.get_block_size()
-        ct_bytes = self.encrypt_mode(block_size, pt_bytes, mode, padding, iv_bytes)
-        return self.bytes_to_hex(ct_bytes)
-
-    def decrypt_hex(
-        self, ciphertext: str, mode: str = "CBC", padding: str = "", iv: str = ""
-    ) -> str:
-        """Decrypt a hex ciphertext string, returning hex plaintext."""
-        ct_bytes = self.hex_to_bytes(ciphertext)
-        iv_bytes = self.hex_to_bytes(iv) if iv else b""
-        block_size = self.get_block_size()
-        pt_bytes = self.decrypt_mode(block_size, ct_bytes, mode, padding, iv_bytes)
-        return self.bytes_to_hex(pt_bytes)
-
-    def get_block_size(self) -> int:
-        """Return block size in bytes. Override in subclass."""
-        raise NotImplementedError("Subclass must implement get_block_size()")
-
-    def encrypt(
-        self,
-        plaintext: Union[bytes, str],
-        mode: str = "CBC",
-        padding: str = "ISO 7816-4",
-        iv: Union[bytes, str] = b"",
-    ) -> Union[bytes, str]:
-        """Encrypt plaintext (bytes or hex string) in the requested mode and padding."""
-        if isinstance(plaintext, str):
-            return self.encrypt_hex(
-                plaintext, mode, padding, iv if isinstance(iv, str) else iv.hex()
-            )
-        iv_bytes = (
-            iv if isinstance(iv, bytes) else (self.hex_to_bytes(iv) if iv else b"")
-        )
-        block_size = self.get_block_size()
-        return self.encrypt_mode(block_size, plaintext, mode, padding, iv_bytes)
-
-    def decrypt(
-        self,
-        ciphertext: Union[bytes, str],
-        mode: str = "CBC",
-        padding: str = "ISO 7816-4",
-        iv: Union[bytes, str] = b"",
-    ) -> Union[bytes, str]:
-        """Decrypt ciphertext (bytes or hex string) in the requested mode and padding."""
-        if isinstance(ciphertext, str):
-            return self.decrypt_hex(
-                ciphertext, mode, padding, iv if isinstance(iv, str) else iv.hex()
-            )
-        iv_bytes = (
-            iv if isinstance(iv, bytes) else (self.hex_to_bytes(iv) if iv else b"")
-        )
-        block_size = self.get_block_size()
-        return self.decrypt_mode(block_size, ciphertext, mode, padding, iv_bytes)
+        return self.unpad_for_mode(bytes(result), block_size, mode, padding)

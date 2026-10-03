@@ -21,13 +21,13 @@ test vectors and, when available, against independent crypto libraries.
 All ciphers share one abstract base class, `EncryptionBase` in
 `encryption_base.py`. It provides the common building blocks (hex/bin/bytes
 conversion, XOR, bit permutations, rotations, padding) and the block-mode
-drivers `encrypt_mode` / `decrypt_mode`.
+`encrypt` / `decrypt`, which take and return `bytes`.
 
 Each cipher subclasses it and implements four methods:
 
 ```python
 get_block_size()                 # block size in bytes
-generate_keys(key)               # key schedule (hex string or bytes)
+generate_keys(key)               # key schedule (bytes)
 encrypt_block(plaintext)  -> bytes
 decrypt_block(ciphertext) -> bytes
 ```
@@ -46,20 +46,19 @@ Internals follow the specifications rather than optimized tricks:
 from AES import AES
 
 c = AES()
-c.generate_keys("000102030405060708090a0b0c0d0e0f")
+c.generate_keys(bytes.fromhex("000102030405060708090a0b0c0d0e0f"))
 c.encrypt_block(bytes.fromhex("00112233445566778899aabbccddeeff")).hex()
 # '69c4e0d86a7b0430d8cdb78070b4c55a'
 ```
 
-Higher-level helpers encrypt arbitrary-length data. Inputs may be `bytes`
-(output `bytes`) or hex strings (output hex). Defaults: CBC mode with
-ISO 7816-4 padding.
+Keys, plaintext, ciphertext and IVs are all `bytes` (a `str`, including a hex
+string, raises `TypeError`). `encrypt` / `decrypt` handle arbitrary-length data. Defaults: CBC mode with ISO 7816-4 padding.
 
 ```python
-ct = c.encrypt("00112233445566778899aabbccddeeff", mode="CBC",
-               padding="ISO 7816-4", iv="00000000000000000000000000000000")
-pt = c.decrypt(ct, mode="CBC",
-               padding="ISO 7816-4", iv="00000000000000000000000000000000")
+iv = bytes(16)
+ct = c.encrypt(b"attack at dawn", mode="CBC", padding="ISO 7816-4", iv=iv)
+pt = c.decrypt(ct, mode="CBC", padding="ISO 7816-4", iv=iv)
+# b'attack at dawn'
 ```
 
 ## Modes and padding

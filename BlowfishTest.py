@@ -101,7 +101,7 @@ def run_official():
     for i, (key, pt, ct) in enumerate(OFFICIAL):
         name = f"official ecb {i + 1:02d}"
         c = Blowfish()
-        c.generate_keys(key)
+        c.generate_keys(bytes.fromhex(key))
         got = c.encrypt_block(bytes.fromhex(pt))
         check(name + " encrypt", got.hex(), ct)
         check(name + " decrypt", c.decrypt_block(got).hex(), pt)
@@ -111,7 +111,7 @@ def run_set_key():
     """Run the 24 set_key vectors covering 1- to 24-byte keys."""
     for key, ct in SET_KEY:
         c = Blowfish()
-        c.generate_keys(key)
+        c.generate_keys(bytes.fromhex(key))
         name = f"set_key {len(key) // 2}-byte key"
         check(name, c.encrypt_block(bytes.fromhex("FEDCBA9876543210")).hex(), ct)
 
@@ -125,23 +125,23 @@ def main():
     run_set_key()
 
     c = Blowfish()
-    c.generate_keys("AABB09182736CCDD")
+    c.generate_keys(bytes.fromhex("AABB09182736CCDD"))
     check("repo vector: key=AABB09182736CCDD -> c8fdcaea64fa2c82",
           c.encrypt_block(bytes.fromhex("123456ABCD132536")).hex(), "c8fdcaea64fa2c82")
 
     print("== ECB multi-block round trip ==")
     c = Blowfish()
-    c.generate_keys("0123456789abcdef")
-    pt = "".join(f"{0xA5 + i:02x}" for i in range(24))
+    c.generate_keys(bytes.fromhex("0123456789abcdef"))
+    pt = bytes(0xA5 + i for i in range(24))
     ct = c.encrypt(pt, mode="ECB")
     check("ecb ciphertext differs from plaintext", ct != pt, True)
     check("ecb encrypt+decrypt restores plaintext", c.decrypt(ct, mode="ECB"), pt)
 
     print("== CBC round trip ==")
     c = Blowfish()
-    c.generate_keys("0123456789abcdef")
-    pt = "000102030405060708090a0b0c0d0e0f"
-    iv = "1122334455667788"
+    c.generate_keys(bytes.fromhex("0123456789abcdef"))
+    pt = bytes(range(16))
+    iv = bytes.fromhex("1122334455667788")
     ct = c.encrypt(pt, mode="CBC", iv=iv)
     check("cbc ciphertext differs from plaintext", ct != pt, True)
     check("cbc encrypt+decrypt restores plaintext",
@@ -149,17 +149,17 @@ def main():
 
     print("== PKCS#7 padding ==")
     c = Blowfish()
-    c.generate_keys("00112233445566778899aabbccddeeff")
-    pt = "123456abcdcd13"
+    c.generate_keys(bytes.fromhex("00112233445566778899aabbccddeeff"))
+    pt = bytes.fromhex("123456abcdcd13")
     ct = c.encrypt(pt, mode="ECB", padding="PKCS")
-    check("7-byte input padded to one block", len(ct), 16)
+    check("7-byte input padded to one block", len(ct), 8)
     check("7-byte input round trip through PKCS padding",
           c.decrypt(ct, mode="ECB", padding="PKCS"), pt)
-    ct = c.encrypt("123456abcdcd1301", mode="ECB", padding="PKCS")
-    check("block-aligned input gets a full extra padding block", len(ct), 32)
-    ct = c.encrypt("", mode="ECB", padding="PKCS")
-    check("empty input padded to one full block", len(ct), 16)
-    ct = c.encrypt("123456abcdcd13ff", mode="ECB", padding="")
+    ct = c.encrypt(bytes.fromhex("123456abcdcd1301"), mode="ECB", padding="PKCS")
+    check("block-aligned input gets a full extra padding block", len(ct), 16)
+    ct = c.encrypt(b"", mode="ECB", padding="PKCS")
+    check("empty input padded to one full block", len(ct), 8)
+    ct = c.encrypt(bytes.fromhex("123456abcdcd13ff"), mode="ECB", padding="")
     check("invalid padding is rejected",
           raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 
@@ -167,7 +167,7 @@ def main():
     for label, key in (("3-byte", "AABBCC"),
                        ("56-byte (max)", "".join(f"{((i * 37) % 256):02x}" for i in range(56)))):
         c = Blowfish()
-        c.generate_keys(key)
+        c.generate_keys(bytes.fromhex(key))
         pt = "123456abcd132536"
         ct = c.encrypt_block(bytes.fromhex(pt)).hex()
         check(f"{label} key: ciphertext differs from plaintext", ct != pt, True)
@@ -178,7 +178,7 @@ def main():
     for label, key in (("empty key rejected", ""),
                        ("57-byte key rejected", "".join(f"{i % 256:02x}" for i in range(57)))):
         try:
-            Blowfish().generate_keys(key)
+            Blowfish().generate_keys(bytes.fromhex(key))
             check(label, False, True)
         except ValueError:
             check(label, True, True)

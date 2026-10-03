@@ -78,7 +78,7 @@ def run_single_block(kats, label):
     """Run AES on the single-block FIPS-197 KATs."""
     for name, key, pt, ct in kats:
         c = AES()
-        c.generate_keys(key)
+        c.generate_keys(bytes.fromhex(key))
         got = c.encrypt_block(bytes.fromhex(pt))
         check(f"{label} {name.lower()} encrypt", got.hex(), ct)
         check(f"{label} {name.lower()} decrypt",
@@ -89,11 +89,12 @@ def run_mode_kats(kats, mode, label):
     """Compare multi-block mode outputs against the SP 800-38A vectors."""
     for name, key, ct in kats:
         c = AES()
-        c.generate_keys(key)
-        got = c.encrypt(SP800_PT, mode=mode, padding="", iv=SP800_IV)
-        check(f"{label} {name.lower()} encrypt", got, ct)
-        got = c.decrypt(ct, mode=mode, padding="", iv=SP800_IV)
-        check(f"{label} {name.lower()} decrypt", got, SP800_PT)
+        c.generate_keys(bytes.fromhex(key))
+        iv = bytes.fromhex(SP800_IV)
+        got = c.encrypt(bytes.fromhex(SP800_PT), mode=mode, padding="", iv=iv)
+        check(f"{label} {name.lower()} encrypt", got.hex(), ct)
+        got = c.decrypt(bytes.fromhex(ct), mode=mode, padding="", iv=iv)
+        check(f"{label} {name.lower()} decrypt", got.hex(), SP800_PT)
 
 
 def main():
@@ -110,8 +111,8 @@ def main():
     print("== ECB multi-block round trip ==")
     for name, key in (("AES-128", K128), ("AES-192", K192), ("AES-256", K256)):
         c = AES()
-        c.generate_keys(key)
-        pt = "".join(f"{0xA5 + i:02x}" for i in range(32))
+        c.generate_keys(bytes.fromhex(key))
+        pt = bytes(0xA5 + i for i in range(32))
         ct = c.encrypt(pt, mode="ECB")
         check(f"{name}: ciphertext differs from plaintext", ct != pt, True)
         check(f"{name}: encrypt+decrypt restores plaintext",
@@ -119,38 +120,41 @@ def main():
 
     print("== CBC two-block round trip ==")
     c = AES()
-    c.generate_keys("2b7e151628aed2a6abf7158809cf4f3c")
-    pt = SP800_PT[0:64]
-    ct = c.encrypt(pt, mode="CBC", iv=SP800_IV)
+    c.generate_keys(bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c"))
+    pt = bytes.fromhex(SP800_PT[0:64])
+    iv = bytes.fromhex(SP800_IV)
+    ct = c.encrypt(pt, mode="CBC", iv=iv)
     check("cbc two-block ciphertext differs from plaintext", ct != pt, True)
     check("cbc two-block encrypt+decrypt restores plaintext",
-          c.decrypt(ct, mode="CBC", iv=SP800_IV), pt)
+          c.decrypt(ct, mode="CBC", iv=iv), pt)
 
     print("== padding edge cases ==")
     c = AES()
-    c.generate_keys(K128)
-    ct = c.encrypt("ABCD", mode="ECB", padding="PKCS")
-    check("2 bytes padded to one block", len(ct), 32)
+    c.generate_keys(bytes.fromhex(K128))
+    ct = c.encrypt(b"\xab\xcd", mode="ECB", padding="PKCS")
+    check("2 bytes padded to one block", len(ct), 16)
     check("2 bytes round trip through PKCS padding",
-          c.decrypt(ct, mode="ECB", padding="PKCS"), "abcd")
-    ct = c.encrypt("", mode="ECB", padding="PKCS")
-    check("empty input padded to one full block", len(ct), 32)
-    pt = "".join(f"{0xA5 + i:02x}" for i in range(31))
+          c.decrypt(ct, mode="ECB", padding="PKCS"), b"\xab\xcd")
+    ct = c.encrypt(b"", mode="ECB", padding="PKCS")
+    check("empty input padded to one full block", len(ct), 16)
+    check("empty input round trips to empty",
+          c.decrypt(ct, mode="ECB", padding="PKCS"), b"")
+    pt = bytes(0xA5 + i for i in range(31))
     ct = c.encrypt(pt, mode="ECB", padding="PKCS")
-    check("31 bytes padded to two blocks", len(ct), 64)
+    check("31 bytes padded to two blocks", len(ct), 32)
     check("31 bytes round trip through PKCS padding",
           c.decrypt(ct, mode="ECB", padding="PKCS"), pt)
-    ct = c.encrypt("00112233445566778899aabbccddeeff", mode="ECB", padding="")
+    ct = c.encrypt(bytes(range(16)), mode="ECB", padding="")
     check("invalid padding is rejected",
           raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 
     print("== padding schemes (ECB/CBC round trip) ==")
-    pt = "aabbccddeeff00112233"
+    pt = bytes.fromhex("aabbccddeeff00112233")
     for pad in ("PKCS", "ANSI X9.23", "ISO 7816-4", "bit", "TBC"):
         for mode in ("ECB", "CBC"):
             c = AES()
-            c.generate_keys(K128)
-            iv = SP800_IV if mode == "CBC" else ""
+            c.generate_keys(bytes.fromhex(K128))
+            iv = bytes.fromhex(SP800_IV) if mode == "CBC" else b""
             ct = c.encrypt(pt, mode=mode, padding=pad, iv=iv)
             check(f"{pad} {mode} round trip",
                   c.decrypt(ct, mode=mode, padding=pad, iv=iv), pt)

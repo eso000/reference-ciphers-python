@@ -83,7 +83,7 @@ def main():
     for alt in (True, False):
         for i, (key, pt, ct) in enumerate(DES_KATS):
             c = DES(use_alt=alt)
-            c.generate_keys(key)
+            c.generate_keys(bytes.fromhex(key))
             got = c.encrypt_block(bytes.fromhex(pt))
             check(f"des alt={alt} kat {i + 1:02d} encrypt", got.hex(), ct)
             check(f"des alt={alt} kat {i + 1:02d} decrypt",
@@ -103,8 +103,8 @@ def main():
     for key, pt, _ in DES_KATS:
         a = DES(use_alt=True)
         b = DES(use_alt=False)
-        a.generate_keys(key)
-        b.generate_keys(key)
+        a.generate_keys(bytes.fromhex(key))
+        b.generate_keys(bytes.fromhex(key))
         check(f"des alt==naive encrypt ({key})",
               a.encrypt_block(bytes.fromhex(pt)),
               b.encrypt_block(bytes.fromhex(pt)))
@@ -114,15 +114,15 @@ def main():
 
     print("== Triple DES known-answer test ==")
     c = TripleDES()
-    c.generate_keys(DES3_KEY)
+    c.generate_keys(bytes.fromhex(DES3_KEY))
     ct = c.encrypt_block(bytes.fromhex("123456ABCD132536"))
     check("3des encrypt", ct.hex(), "e6803bea92016d52")
     check("3des decrypt", c.decrypt_block(ct).hex(), "123456ABCD132536")
 
     print("== DES ECB multi-block round trip ==")
     c = DES()
-    c.generate_keys(DES_KEY)
-    pt = "".join(f"{0x10 + i:02x}" for i in range(16))
+    c.generate_keys(bytes.fromhex(DES_KEY))
+    pt = bytes(0x10 + i for i in range(16))
     ct = c.encrypt(pt, mode="ECB")
     check("des ecb ciphertext differs from plaintext", ct != pt, True)
     check("des ecb encrypt+decrypt restores plaintext",
@@ -130,9 +130,9 @@ def main():
 
     print("== DES CBC round trip ==")
     c = DES()
-    c.generate_keys(DES_KEY)
-    pt = "".join(f"{0xA0 + i:02x}" for i in range(16))
-    iv = "0000000000000000"
+    c.generate_keys(bytes.fromhex(DES_KEY))
+    pt = bytes(0xA0 + i for i in range(16))
+    iv = bytes(8)
     ct = c.encrypt(pt, mode="CBC", iv=iv)
     check("des cbc ciphertext differs from plaintext", ct != pt, True)
     check("des cbc encrypt+decrypt restores plaintext",
@@ -141,9 +141,9 @@ def main():
     print("== Triple DES ECB/CBC round trip ==")
     for mode in ("ECB", "CBC"):
         c = TripleDES()
-        c.generate_keys(DES3_KEY)
-        pt = "".join(f"{0x30 + i:02x}" for i in range(16))
-        iv = "1122334455667788" if mode == "CBC" else ""
+        c.generate_keys(bytes.fromhex(DES3_KEY))
+        pt = bytes(0x30 + i for i in range(16))
+        iv = bytes.fromhex("1122334455667788") if mode == "CBC" else b""
         ct = c.encrypt(pt, mode=mode, iv=iv)
         check(f"3des {mode.lower()} ciphertext differs from plaintext",
               ct != pt, True)
@@ -152,15 +152,15 @@ def main():
 
     print("== PKCS#7 padding ==")
     c = DES()
-    c.generate_keys(DES_KEY)
-    pt = "123456abcdcd13"
+    c.generate_keys(bytes.fromhex(DES_KEY))
+    pt = bytes.fromhex("123456abcdcd13")
     ct = c.encrypt(pt, mode="ECB", padding="PKCS")
-    check("7-byte input padded to one block", len(ct), 16)
+    check("7-byte input padded to one block", len(ct), 8)
     check("7-byte input round trip through PKCS padding",
           c.decrypt(ct, mode="ECB", padding="PKCS"), pt)
-    ct = c.encrypt("", mode="ECB", padding="PKCS")
-    check("empty input padded to one full block", len(ct), 16)
-    ct = c.encrypt("00112233445566ff", mode="ECB", padding="")
+    ct = c.encrypt(b"", mode="ECB", padding="PKCS")
+    check("empty input padded to one full block", len(ct), 8)
+    ct = c.encrypt(bytes.fromhex("00112233445566ff"), mode="ECB", padding="")
     check("invalid padding is rejected",
           raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 

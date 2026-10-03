@@ -57,7 +57,7 @@ def main():
     for i, (key, pt, ct) in enumerate(KATS):
         name = f"kat {i + 1:02d}"
         c = Twofish()
-        c.generate_keys(key)
+        c.generate_keys(bytes.fromhex(key))
         got = c.encrypt_block(bytes.fromhex(pt))
         check(name + " encrypt", got.hex(), ct)
         check(name + " decrypt", c.decrypt_block(got).hex(), pt)
@@ -65,8 +65,8 @@ def main():
     print("== ECB multi-block round trip (all key sizes) ==")
     for label, key in KEYS:
         c = Twofish()
-        c.generate_keys(key)
-        pt = "".join(f"{0xA5 + i:02x}" for i in range(32))
+        c.generate_keys(bytes.fromhex(key))
+        pt = bytes(0xA5 + i for i in range(32))
         ct = c.encrypt(pt, mode="ECB")
         check(f"{label}: ciphertext differs from plaintext", ct != pt, True)
         check(f"{label}: encrypt+decrypt restores plaintext",
@@ -74,9 +74,9 @@ def main():
 
     print("== CBC two-block round trip ==")
     c = Twofish()
-    c.generate_keys("0123456789abcdef0123456789abcdef")
-    pt = "".join(f"{i:02x}" for i in range(32))
-    iv = "aa" * 16
+    c.generate_keys(bytes.fromhex("0123456789abcdef0123456789abcdef"))
+    pt = bytes(range(32))
+    iv = b"\xaa" * 16
     ct = c.encrypt(pt, mode="CBC", iv=iv)
     check("cbc two-block ciphertext differs from plaintext", ct != pt, True)
     check("cbc two-block encrypt+decrypt restores plaintext",
@@ -84,15 +84,15 @@ def main():
 
     print("== PKCS#7 padding (16-byte blocks) ==")
     c = Twofish()
-    c.generate_keys("00112233445566778899aabbccddeeff")
-    pt = "123456abcdcd13"
+    c.generate_keys(bytes.fromhex("00112233445566778899aabbccddeeff"))
+    pt = bytes.fromhex("123456abcdcd13")
     ct = c.encrypt(pt, mode="ECB", padding="PKCS")
-    check("7-byte input padded to one block", len(ct), 32)
+    check("7-byte input padded to one block", len(ct), 16)
     check("7-byte input round trip through PKCS padding",
           c.decrypt(ct, mode="ECB", padding="PKCS"), pt)
-    ct = c.encrypt("", mode="ECB", padding="PKCS")
-    check("empty input padded to one full block", len(ct), 32)
-    ct = c.encrypt("00112233445566778899aabbccddeeff", mode="ECB", padding="")
+    ct = c.encrypt(b"", mode="ECB", padding="PKCS")
+    check("empty input padded to one full block", len(ct), 16)
+    ct = c.encrypt(bytes(range(16)), mode="ECB", padding="")
     check("invalid padding is rejected",
           raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 

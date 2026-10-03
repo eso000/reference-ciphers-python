@@ -1,7 +1,5 @@
 """Blowfish (Schneier 1994), implemented step by step for teaching."""
 
-from typing import Union
-
 from encryption_base import EncryptionBase
 
 # Blowfish data tables (PBOX, SBOXES) are in the appendix at the end of this file.
@@ -17,14 +15,13 @@ class Blowfish(EncryptionBase):
     def get_block_size(self) -> int:
         return 8  # 64 bits = 8 bytes
 
-    def generate_keys(self, key: Union[bytes, str]) -> None:
+    def generate_keys(self, key: bytes) -> None:
         """Build the key schedule: key-XOR the P-array, then re-encrypt P and the S-boxes.
 
         Blowfish accepts keys of 1 to 56 bytes; shorter keys are used as-is and
         the key bytes are cycled when filling the 18 32-bit P-array words.
         """
-        if isinstance(key, str):
-            key = self.hex_to_bytes(key)
+        key = self._as_bytes(key, "key")
         if len(key) < 1 or len(key) > 56:
             raise ValueError("Blowfish key must be 1 to 56 bytes")
 

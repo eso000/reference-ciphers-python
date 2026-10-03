@@ -1,7 +1,5 @@
 """Advanced Encryption Standard (FIPS-197), implemented step by step for teaching."""
 
-from typing import Union
-
 from encryption_base import EncryptionBase
 
 # AES S-box tables (SBOX, INV_SBOX) are in the appendix at the end of this file.
@@ -52,12 +50,12 @@ class AES(EncryptionBase):
         """XOR the state with a 16-byte round key."""
         return [state[i] ^ round_key[i] for i in range(16)]
 
-    def generate_keys(self, key: Union[bytes, str]) -> None:
-        """Expand a 128/192/256-bit key into the round-key schedule."""
-        if isinstance(key, str):
-            key = self.hex_to_bytes(key)
-        key = self.pad_key_hex(key.hex(), [32, 48, 64])
-        key_bytes = self.hex_to_bytes(key)
+    def generate_keys(self, key: bytes) -> None:
+        """Expand a 128/192/256-bit key into the round-key schedule.
+
+        Shorter keys are zero-padded up to the next valid size.
+        """
+        key_bytes = self.pad_key(self._as_bytes(key, "key"), [16, 24, 32])
         n_words = len(key_bytes) // 4
         rounds = AES_ROUNDS[n_words]
 
