@@ -2,7 +2,7 @@
 
 from AES import AES
 from Blowfish import Blowfish
-from DES import DES, TrippleDES
+from DES import DES, TripleDES
 from Serpent import Serpent
 from Twofish import Twofish
 
@@ -18,7 +18,7 @@ if c.decrypt_block(bytes.fromhex(cipher)).hex() != "123456abcd132536":
     passed = False
     print("DES failed to decrypt")
 
-c = TrippleDES()
+c = TripleDES()
 c.generate_keys("AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c")
 cipher = c.encrypt_block(bytes.fromhex("123456ABCD132536")).hex()
 if cipher != 'e6803bea92016d52':

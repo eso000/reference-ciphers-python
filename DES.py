@@ -9,11 +9,11 @@ from encryption_base import EncryptionBase
 
 # Alternative IP/FP: instead of the generic per-bit permutation (permutate_int),
 # compute the same IP/FP as a delta-swap network of ~6 masked shift/XOR/rotate
-# operations (Wei Dai's variant of Richard Outerbridge's IP algorithm, as used
-# in Crypto++). The networks operate on the two 32-bit halves; the outer half
-# rotations compensate for the bit layout convention. ip_perm_alt and
-# fp_perm_alt produce exactly the IP and FP tables in the appendix below, and are mutual
-# inverses (verified in DESTest.py).
+# operations (Wei Dai's variant of Richard Outerbridge's IP algorithm). The
+# networks operate on the two 32-bit halves; the outer half rotations
+# compensate for the bit layout convention. ip_perm_alt and fp_perm_alt produce
+# exactly the IP and FP tables in the appendix below, and are mutual inverses
+# (verified in DESTest.py).
 _M32 = 0xFFFFFFFF
 
 
@@ -169,7 +169,7 @@ class DES(EncryptionBase):
         return result.to_bytes(8, "big")
 
 
-class TrippleDES(EncryptionBase):
+class TripleDES(EncryptionBase):
     """Three-key triple DES: Encrypt-Decrypt-Encrypt over three DES instances."""
 
     def __init__(self, use_alt: bool = True):

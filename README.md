@@ -35,7 +35,7 @@ decrypt_block(ciphertext) -> bytes
 Internals follow the specifications rather than optimized tricks:
 
 - **AES** – GF(2^8) arithmetic (`xtime`, `gmul`), SubBytes/ShiftRows/MixColumns, key expansion.
-- **DES** – integer-based bit permutations/expansion and a Feistel `f` function; `TrippleDES` is EDE.
+- **DES** – integer-based bit permutations/expansion and a Feistel `f` function; `TripleDES` is EDE.
 - **Blowfish** – full on-spec P-array and S-box tables, 16-round Feistel.
 - **Twofish** – GF polynomial multiplication, MDS matrices, PHT, q-boxes.
 - **Serpent** – bit-reversed words, bit-sliced S-box boolean circuits, linear transform.
@@ -64,7 +64,7 @@ pt = c.decrypt(ct, mode="CBC",
 
 ## Modes and padding
 
-- Modes: **ECB, CBC, PCBC, CFB, OFB, CTR** (matching the C/C++ ports).
+- Modes: **ECB, CBC, PCBC, CFB, OFB, CTR**.
 - Padding: bit-level zero padding and **ISO 7816-4**, plus unpadding.
 - Block-level API (`encrypt_block` / `decrypt_block`) takes exactly one block.
 

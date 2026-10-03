@@ -1,7 +1,7 @@
 """Block-mode round trips (ECB/CBC/PCBC/CFB/OFB/CTR) for every cipher.
 
-Mirrors the ``BlockCipher`` mode exercises from the C port: each cipher is
-run through all six modes on a three-block message with a per-mode IV.
+Each cipher is run through all six modes on a three-block message with a
+per-mode IV.
 """
 
 import sys
