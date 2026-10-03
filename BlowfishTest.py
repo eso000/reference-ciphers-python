@@ -22,6 +22,15 @@ def check(name, got, want):
         _FAILS += 1
 
 
+def raises_value_error(func):
+    """Return True when calling ``func`` raises ValueError."""
+    try:
+        func()
+    except ValueError:
+        return True
+    return False
+
+
 OFFICIAL = [
     ("0000000000000000", "0000000000000000", "4EF997456198DD78"),
     ("FFFFFFFFFFFFFFFF", "FFFFFFFFFFFFFFFF", "51866FD5B85ECB8A"),
@@ -146,13 +155,13 @@ def main():
     check("7-byte input padded to one block", len(ct), 16)
     check("7-byte input round trip through PKCS padding",
           c.decrypt(ct, mode="ECB", padding="PKCS"), pt)
-    ct = c.encrypt("12345678", mode="ECB", padding="PKCS")
-    check("block-aligned input stays one block", len(ct), 16)
+    ct = c.encrypt("123456abcdcd1301", mode="ECB", padding="PKCS")
+    check("block-aligned input gets a full extra padding block", len(ct), 32)
     ct = c.encrypt("", mode="ECB", padding="PKCS")
     check("empty input padded to one full block", len(ct), 16)
     ct = c.encrypt("123456abcdcd13ff", mode="ECB", padding="")
-    check("invalid padding is not stripped",
-          len(c.decrypt(ct, mode="ECB", padding="PKCS")), 16)
+    check("invalid padding is rejected",
+          raises_value_error(lambda: c.decrypt(ct, mode="ECB", padding="PKCS")), True)
 
     print("== standard key schedule (non-aligned key lengths) ==")
     for label, key in (("3-byte", "AABBCC"),
