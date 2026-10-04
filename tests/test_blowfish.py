@@ -3,8 +3,7 @@
 import unittest
 
 from src.Blowfish import Blowfish
-from tests.vectors import (BLOWFISH_OFFICIAL, BLOWFISH_SET_KEY,
-                           BLOWFISH_SET_KEY_PT)
+from tests.vectors import BLOWFISH_OFFICIAL, BLOWFISH_SET_KEY, BLOWFISH_SET_KEY_PT
 
 
 class BlowfishKATTestCase(unittest.TestCase):
@@ -20,8 +19,9 @@ class BlowfishKATTestCase(unittest.TestCase):
             with self.subTest(vector=f"official ecb {i + 1:02d}"):
                 cipher = Blowfish()
                 cipher.generate_keys(bytes.fromhex(key))
-                self.assertEqual(cipher.encrypt_block(bytes.fromhex(pt)),
-                                 bytes.fromhex(ct))
+                self.assertEqual(
+                    cipher.encrypt_block(bytes.fromhex(pt)), bytes.fromhex(ct)
+                )
 
     def test_official_ecb_decrypt(self):
         """Decrypt every official ECB vector."""
@@ -29,8 +29,9 @@ class BlowfishKATTestCase(unittest.TestCase):
             with self.subTest(vector=f"official ecb {i + 1:02d}"):
                 cipher = Blowfish()
                 cipher.generate_keys(bytes.fromhex(key))
-                self.assertEqual(cipher.decrypt_block(bytes.fromhex(ct)),
-                                 bytes.fromhex(pt))
+                self.assertEqual(
+                    cipher.decrypt_block(bytes.fromhex(ct)), bytes.fromhex(pt)
+                )
 
     def test_set_key_vectors(self):
         """Encrypt the fixed plaintext under 4- to 24-byte keys.
@@ -42,8 +43,7 @@ class BlowfishKATTestCase(unittest.TestCase):
             with self.subTest(key_size=len(key) * 4):
                 cipher = Blowfish()
                 cipher.generate_keys(bytes.fromhex(key))
-                got = cipher.encrypt_block(
-                    bytes.fromhex(BLOWFISH_SET_KEY_PT))
+                got = cipher.encrypt_block(bytes.fromhex(BLOWFISH_SET_KEY_PT))
                 self.assertEqual(got, bytes.fromhex(ct))
 
 

@@ -8,9 +8,9 @@ each other, and exercises the 3DES vector plus round trips.
 import random
 import unittest
 
-from src.DES import DES, TripleDES, IP, FP, SPBOXES, _build_spboxes, \
-    ip_perm_alt, fp_perm_alt
-from tests.vectors import DES3_KATS, DES_KATS
+from src.DES import (DES, TripleDES, IP, FP, SPBOXES, _build_spboxes,
+                     ip_perm_alt, fp_perm_alt)
+from tests.vectors import DES_KATS
 
 
 def reference_permutation(value, perm, width):
@@ -125,26 +125,75 @@ class DESImplementationAgreementTestCase(unittest.TestCase):
                                  naive.decrypt_block(bytes.fromhex(pt)))
 
 
-class TripleDESKATTestCase(unittest.TestCase):
-    """The repository's single 3DES vector."""
+class TripleDESEDETestCase(unittest.TestCase):
+    """3DES EDE consistency, without a published KAT.
 
-    def test_encrypt(self):
-        """Encrypt the 3DES vector."""
-        for name, key, pt, ct in DES3_KATS:
-            with self.subTest(vector=name):
-                cipher = TripleDES()
-                cipher.generate_keys(bytes.fromhex(key))
-                self.assertEqual(cipher.encrypt_block(bytes.fromhex(pt)),
-                                 bytes.fromhex(ct))
+    No triple-DES vector in this module has confirmed provenance, so 3DES is
+    checked structurally rather than against an expected ciphertext. These are
+    the properties that catch key-order, key-assignment and direction
+    mistakes, which a plain encrypt/decrypt round trip cannot.
+    """
 
-    def test_decrypt(self):
-        """Decrypt the 3DES vector."""
-        for name, key, pt, ct in DES3_KATS:
-            with self.subTest(vector=name):
-                cipher = TripleDES()
-                cipher.generate_keys(bytes.fromhex(key))
-                self.assertEqual(cipher.decrypt_block(bytes.fromhex(ct)),
-                                 bytes.fromhex(pt))
+    KEY = "AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c"
+    K1, K2, K3 = (KEY[:16], KEY[16:32], KEY[32:])
+    BLOCK = bytes.fromhex("0123456789ABCDEF")
+
+    def keyed(self, keys):
+        """Return a TripleDES loaded with the concatenated hex ``keys``."""
+        cipher = TripleDES()
+        cipher.generate_keys(bytes.fromhex("".join(keys)))
+        return cipher
+
+    def test_key_split_matches_layer_order(self):
+        """Each 24-byte key third lands on the layer that uses it.
+
+        Catches generate_keys assigning the key thirds to the DES instances
+        in the wrong order.
+        """
+        cipher = self.keyed((self.K1, self.K2, self.K3))
+        single = DES()
+        for layer, key_hex in ((cipher.des1, self.K1), (cipher.des2, self.K2),
+                               (cipher.des3, self.K3)):
+            single.generate_keys(bytes.fromhex(key_hex))
+            self.assertEqual(layer.subkeys, single.subkeys)
+
+    def test_three_equal_keys_reduce_to_single_des(self):
+        """When all three keys match, EDE collapses to one plain DES pass.
+
+        E_K(D_K(E_K(x))) == E_K(x), so this is a real algebraic property of
+        the construction, not a restatement of the code.
+        """
+        cipher = self.keyed((self.K1, self.K1, self.K1))
+        single = DES()
+        single.generate_keys(bytes.fromhex(self.K1))
+        self.assertEqual(cipher.encrypt_block(self.BLOCK),
+                         single.encrypt_block(self.BLOCK))
+        self.assertEqual(cipher.decrypt_block(self.BLOCK),
+                         single.decrypt_block(self.BLOCK))
+
+    def test_layers_are_encrypt_decrypt_encrypt(self):
+        """The outer layers encrypt and the middle layer decrypts."""
+        cipher = self.keyed((self.K1, self.K2, self.K3))
+        single = DES()
+        single.generate_keys(bytes.fromhex(self.K1))
+        step1 = single.encrypt_block(self.BLOCK)
+
+        single.generate_keys(bytes.fromhex(self.K2))
+        step2 = single.decrypt_block(step1)
+
+        single.generate_keys(bytes.fromhex(self.K3))
+        self.assertEqual(cipher.encrypt_block(self.BLOCK),
+                         single.encrypt_block(step2))
+
+    def test_decrypt_is_the_inverse(self):
+        """EDE decryption undoes EDE encryption on random blocks."""
+        rng = random.Random(7)
+        cipher = self.keyed((self.K1, self.K2, self.K3))
+        for _ in range(64):
+            block = rng.randbytes(8)
+            with self.subTest(block=block):
+                self.assertEqual(cipher.decrypt_block(cipher.encrypt_block(block)),
+                                 block)
 
 
 class DESRoundTripTestCase(unittest.TestCase):

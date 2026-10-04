@@ -101,9 +101,8 @@ python3 -m unittest tests.test_aes -v        # one module
 
 | Module | Covers |
 |---|---|
-| `tests/test_smoke.py` | one headline vector per cipher |
 | `tests/test_aes.py` | FIPS-197 C.1–C.3, SP 800-38A ECB and CBC |
-| `tests/test_des.py` | classic DES vectors, IP/FP and `f` cross-checks, 3DES |
+| `tests/test_des.py` | classic DES vectors, IP/FP and `f` cross-checks, 3DES EDE properties |
 | `tests/test_blowfish.py` | Schneier's official ECB and `set_key` sets |
 | `tests/test_twofish.py` | the official submission KATs |
 | `tests/test_serpent.py` | the NESSIE/verified sets, plus S-box cross-checks |
@@ -138,25 +137,36 @@ python3 verify_vectors.py
 ## Project layout
 
 ```
-encryption_base.py   Shared base class: XOR/permutation/rotation, mode-aware padding, all block modes
-AES.py               AES implementation
-DES.py               DES and 3DES implementations
-Blowfish.py          Blowfish implementation (includes spec tables)
-Twofish.py           Twofish implementation
-Serpent.py           Serpent implementation
+pyproject.toml         Packaging metadata (src layout, no runtime deps)
+src/
+  __init__.py          Re-exports every cipher class
+  encryption_base.py   Shared base class: XOR/permutation/rotation, mode-aware padding, all block modes
+  AES.py               AES implementation
+  DES.py               DES and 3DES implementations
+  Blowfish.py          Blowfish implementation (includes spec tables)
+  Twofish.py           Twofish implementation
+  Serpent.py           Serpent implementation
 
-AESTest.py           AES test vectors
-DESTest.py           DES / 3DES test vectors
-BlowfishTest.py      Blowfish test vectors
-TwofishTest.py       Twofish test vectors
-SerpentTest.py       Serpent (NESSIE) test vectors
+tests/
+  vectors.py           Published known-answer vectors, shared with verify_vectors.py
+  test_aes.py          FIPS-197 and SP 800-38A
+  test_des.py          DES vectors, permutation cross-checks, 3DES EDE properties
+  test_blowfish.py     Schneier's official ECB and set_key sets
+  test_twofish.py      Official submission KATs
+  test_serpent.py      NESSIE/verified sets, S-box cross-checks
+  test_encryption_base.py  Padding schemes and shared helpers
+  test_modes.py        All block modes, padding and length validation
 
-test.py              Quick end-to-end smoke test
-ModeTest.py          Block-mode round trips (ECB/CBC/PCBC/CFB/OFB/CTR)
 verify_vectors.py    In-repo + external-oracle verification harness
 benchmark.py         Timing script for the ciphers
 pylintrc             Lint configuration for the teaching-style code
 ```
+
+Every cipher and every vector in `tests/vectors.py` is traceable to a
+publication. Triple DES is the one exception: it has no vector of confirmed
+provenance here, so `tests/test_des.py` checks it structurally (EDE layer
+order, key-split assignment, the collapse to single DES when all three keys
+match) rather than against an expected ciphertext.
 
 ## Security notice
 
