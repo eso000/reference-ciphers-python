@@ -1,9 +1,9 @@
 """Cross-implementation verification harness for the teaching ciphers.
 
-Always checks every cipher in this repo against the official published
-test vectors reused from the per-cipher unit-test modules (FIPS-197 and
-SP 800-38A for AES, the classic DES values, Schneier's Blowfish sets,
-the Twofish AES-submission KATs, and the NESSIE/verified Serpent set).
+Always checks every cipher in this repo against the published test vectors
+in tests/vectors.py (FIPS-197 and SP 800-38A for AES, the classic DES
+values, Schneier's Blowfish sets, the Twofish AES-submission KATs, and the
+NESSIE/verified Serpent set).
 
 When an external crypto library is installed it is used as a second,
 independent oracle:
@@ -21,17 +21,17 @@ from typing import Callable, Dict, List, Tuple
 
 from src.AES import AES
 from src.Blowfish import Blowfish
-from src.DES import DES, TripleDES
+from src.DES import DES
 from src.Serpent import Serpent
 from src.Twofish import Twofish
 
 from tests.vectors import programs as vector_programs
 
 try:
-    from Crypto.Cipher import AES as PY_AES, DES as PY_DES, DES3 as PY_DES3
+    from Crypto.Cipher import AES as PY_AES, DES as PY_DES
     from Crypto.Cipher import Blowfish as PY_BF
 except ImportError:
-    PY_AES = PY_DES = PY_DES3 = PY_BF = None
+    PY_AES = PY_DES = PY_BF = None
 
 Kats = List[Tuple[str, str, str, str]]
 
@@ -40,8 +40,8 @@ PROGRAMS = vector_programs()
 
 def get_impl(cipher: str):
     """Return (generate_keys, encrypt_block, decrypt_block) for ``cipher``."""
-    classes = {"AES": AES, "DES": DES, "DES3": TripleDES,
-               "Blowfish": Blowfish, "Twofish": Twofish, "Serpent": Serpent}
+    classes = {"AES": AES, "DES": DES, "Blowfish": Blowfish,
+               "Twofish": Twofish, "Serpent": Serpent}
     obj = classes[cipher]()
     return obj.generate_keys, obj.encrypt_block, obj.decrypt_block
 
@@ -60,8 +60,7 @@ def official_oracles() -> Dict[str, List[Tuple[str, Callable, Callable]]]:
 
             return enc, dec
 
-        for name, mod in (("AES", PY_AES), ("DES", PY_DES),
-                          ("DES3", PY_DES3), ("Blowfish", PY_BF)):
+        for name, mod in (("AES", PY_AES), ("DES", PY_DES), ("Blowfish", PY_BF)):
             enc, dec = ecb(mod)
             found[name] = [("pycrypto", enc, dec)]
 
@@ -154,9 +153,14 @@ def run(cipher: str) -> Tuple[str, List[str]]:
 
 
 def main() -> int:
-    """Run all ciphers and report the combined status."""
+    """Run all ciphers and report the combined status.
+
+    Triple DES is absent on purpose: it has no vector of confirmed
+    provenance here, and an oracle cannot cross-check a value we do not
+    trust. tests/test_des.py checks it structurally instead.
+    """
     failures = 0
-    for cipher in ("AES", "DES", "DES3", "Blowfish", "Twofish", "Serpent"):
+    for cipher in PROGRAMS:
         print(f"== {cipher} ==")
         line, reports = run(cipher)
         print(line)

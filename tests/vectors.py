@@ -7,7 +7,10 @@ import from here, so a vector is only ever written down once.
 Provenance
 ----------
 AES       FIPS-197 C.1/C.2/C.3 and NIST SP 800-38A ECB/CBC.
-DES       the classic single-DES values plus the repository's 3DES vector.
+DES       the classic published single-DES values (the FIPS 46-3 walkthrough
+          pair, plus the two from the original DES paper's own test set). The
+          ``AABB09182736CCDD`` entry is widely reproduced but does not appear
+          in those sources, so its provenance is unconfirmed.
 Blowfish  Schneier's 34-entry official ECB set and the official ``set_key``
           vectors for 4- to 24-byte keys. Keys under 4 bytes (32 bits) are
           outside the specification and are rejected, so the 1- to 3-byte
@@ -66,11 +69,6 @@ DES_KATS = [
     ("133457799BBCDFF1", "0123456789ABCDEF", "85E813540F0AB405"),
     ("0E329232EA6D0D73", "8787878787878787", "0000000000000000"),
     ("AABB09182736CCDD", "123456ABCD132536", "C0B7A8D05F3A829C"),
-]
-
-DES3_KATS = [
-    ("3DES kat", "AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c",
-     "123456ABCD132536", "e6803bea92016d52"),
 ]
 
 BLOWFISH_OFFICIAL = [
@@ -203,21 +201,6 @@ SERPENT_KATS = [
      SERPENT_P1, "3e507730776b93fdea661235e1dd99f0"),
 ]
 
-# One headline vector per cipher: (cipher_name, key_hex, plaintext_hex,
-# ciphertext_hex). These double as the smoke test and the "does it import and
-# schedule keys at all" check. Each is drawn from the official set above
-# rather than invented, so a failure here means a real regression.
-SMOKE_VECTORS = (
-    ("DES", DES_KATS[2][0], DES_KATS[2][1], DES_KATS[2][2]),
-    ("3DES", DES3_KATS[0][1], DES3_KATS[0][2], DES3_KATS[0][3]),
-    ("Blowfish", BLOWFISH_OFFICIAL[7][0], BLOWFISH_OFFICIAL[7][1],
-     BLOWFISH_OFFICIAL[7][2]),
-    ("AES", AES_FIPS[0][1], AES_FIPS[0][2], AES_FIPS[0][3]),
-    ("Serpent", SERPENT_KATS[10][1], SERPENT_KATS[10][2], SERPENT_KATS[10][3]),
-    ("Twofish", TWOFISH_KATS[0][0], TWOFISH_KATS[0][1], TWOFISH_KATS[0][2]),
-)
-
-
 def named(triples, prefix):
     """Prefix (key, plaintext, ciphertext) triples with generated names."""
     return [(f"{prefix} {i}", k, p, c)
@@ -232,7 +215,6 @@ def programs():
     return {
         "AES": AES_FIPS,
         "DES": named(DES_KATS, "des"),
-        "DES3": DES3_KATS,
         "Blowfish": blowfish,
         "Twofish": named(TWOFISH_KATS, "b2"),
         "Serpent": SERPENT_KATS,
