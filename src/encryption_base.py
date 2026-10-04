@@ -1,6 +1,6 @@
 """Shared arithmetic and padding helpers for the teaching ciphers."""
 
-from typing import List
+from typing import Iterable, List, Union
 
 
 class EncryptionBase:
@@ -143,13 +143,30 @@ class EncryptionBase:
         return bytes(value)
 
     @classmethod
-    def _checked_key(cls, key: bytes, sizes: tuple, label: str) -> bytes:
+    def _checked_key(cls, key: bytes, sizes: Union[Iterable[int], range], label: str) -> bytes:
         """Return ``key`` as bytes, requiring its length to be in ``sizes``."""
         key = cls._as_bytes(key, "key")
-        if len(key) not in sizes:
-            allowed = ", ".join(str(n) for n in sizes[:-1])
-            allowed = f"{allowed} or {sizes[-1]}" if allowed else str(sizes[-1])
-            raise ValueError(f"{label} key must be {allowed} bytes, got {len(key)}")
+        key_len = len(key)
+        if isinstance(sizes, range):
+            if key_len not in sizes:
+                start = sizes.start
+                end = sizes.stop - 1
+                if start == end:
+                    allowed = str(start)
+                else:
+                    allowed = f"{start} to {end} bytes"
+                raise ValueError(f"{label} key must be {allowed}, got {key_len}")
+            return key
+        if isinstance(sizes, tuple):
+            if key_len not in sizes:
+                if len(sizes) == 1:
+                    allowed = str(sizes[0])
+                else:
+                    allowed = ", ".join(str(n) for n in sizes[:-1]) + f" or {sizes[-1]}"
+                raise ValueError(f"{label} key must be {allowed} bytes, got {key_len}")
+            return key
+        if key_len not in sizes:
+            raise ValueError(f"{label} key length not allowed, got {key_len}")
         return key
 
     def _checked_block(self, data: bytes) -> bytes:

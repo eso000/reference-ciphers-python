@@ -75,11 +75,11 @@ class InputValidationTestCase(unittest.TestCase):
 
     def test_key_sizes(self):
         """Each cipher accepts exactly its valid key sizes."""
-        for cls, valid in KEY_SIZES:
+        for cls, _valid in KEY_SIZES:
             name = cls.__name__.lower()
             for n in range(66):
                 with self.subTest(cipher=name, key_size=n):
-                    if n in valid:
+                    if n in _valid:
                         cls().generate_keys(bytes(n))
                     else:
                         with self.assertRaises(ValueError):
@@ -87,8 +87,8 @@ class InputValidationTestCase(unittest.TestCase):
 
     def test_block_sizes(self):
         """encrypt_block/decrypt_block reject anything but one full block."""
-        for cls, valid in KEY_SIZES:
-            cipher = _keyed(cls, "00" * valid[0])
+        for cls, _valid in KEY_SIZES:
+            cipher = _keyed(cls, "00" * _valid[0])
             size = cipher.block_size
             for func in (cipher.encrypt_block, cipher.decrypt_block):
                 for n in (0, size - 1, size + 1, 2 * size):
@@ -98,8 +98,8 @@ class InputValidationTestCase(unittest.TestCase):
 
     def test_iv_sizes(self):
         """Every mode except ECB rejects an IV that is not one full block."""
-        for cls, valid in KEY_SIZES:
-            cipher = _keyed(cls, "00" * valid[0])
+        for cls, _valid in KEY_SIZES:
+            cipher = _keyed(cls, "00" * _valid[0])
             size = cipher.block_size
             for mode in MODES:
                 for n in (size - 1, size + 1, 2 * size):
@@ -112,8 +112,8 @@ class InputValidationTestCase(unittest.TestCase):
 
     def test_ecb_rejects_iv(self):
         """ECB takes no IV at all."""
-        for cls, valid in KEY_SIZES:
-            cipher = _keyed(cls, "00" * valid[0])
+        for cls, _valid in KEY_SIZES:
+            cipher = _keyed(cls, "00" * _valid[0])
             with self.subTest(cipher=cls.__name__):
                 with self.assertRaises(ValueError):
                     cipher.encrypt(bytes(cipher.block_size), mode="ECB",
@@ -121,24 +121,24 @@ class InputValidationTestCase(unittest.TestCase):
 
     def test_cbc_requires_iv(self):
         """The default mode is CBC and it refuses to invent an IV."""
-        for cls, valid in KEY_SIZES:
-            cipher = _keyed(cls, "00" * valid[0])
+        for cls, _valid in KEY_SIZES:
+            cipher = _keyed(cls, "00" * _valid[0])
             with self.subTest(cipher=cls.__name__):
                 with self.assertRaises(ValueError):
                     cipher.encrypt(b"data")
 
     def test_str_keys_rejected(self):
         """Keys must be bytes-like; str (hex) keys are rejected everywhere."""
-        for cls, valid in KEY_SIZES:
+        for cls, _valid in KEY_SIZES:
             with self.subTest(cipher=cls.__name__):
                 with self.assertRaises(TypeError):
                     cls().generate_keys("00" * 8)
 
     def test_bytearray_key_matches_bytes_key(self):
         """A bytearray key schedules identically to the equivalent bytes key."""
-        for cls, valid in KEY_SIZES:
+        for cls, _valid in KEY_SIZES:
             name = cls.__name__.lower()
-            key = bytes(range(valid[0]))
+            key = bytes(range(_valid[0]))
             by_bytes = _keyed(cls, key.hex())
             by_array = cls()
             by_array.generate_keys(bytearray(key))
