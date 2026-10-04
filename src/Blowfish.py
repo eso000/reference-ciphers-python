@@ -20,9 +20,7 @@ class Blowfish(EncryptionBase):
         Blowfish accepts keys of 4 to 56 bytes (32 to 448 bits, as specified); the
         key bytes are cycled when filling the 18 32-bit P-array words.
         """
-        key = self._as_bytes(key, "key")
-        if not 4 <= len(key) <= 56:
-            raise ValueError(f"Blowfish key must be 4 to 56 bytes, got {len(key)}")
+        key = self._checked_key(key, range(4, 57), "Blowfish")
 
         keys = []
         bit_len = len(key) * 8

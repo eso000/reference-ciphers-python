@@ -10,9 +10,34 @@ from src.encryption_base import EncryptionBase
 
 
 class DummyCipher(EncryptionBase):
-    """Minimal concrete cipher so the base class can be exercised directly."""
+    """Toy 64-bit cipher that uses the base-class helpers as real ciphers do.
+
+    ``generate_keys`` validates the key with ``_checked_key`` and the block
+    methods validate their input with ``_checked_block``, so the private guards
+    are exercised through the public interface. The transform (XOR with the
+    key, then reverse the bytes) is trivially invertible and NOT secure.
+    """
 
     block_size = 8
+    key_size = 8
+
+    def __init__(self):
+        """Start with no key; call ``generate_keys`` before encrypting."""
+        self.key = b""
+
+    def generate_keys(self, key: bytes) -> None:
+        """Store ``key`` after checking that it is exactly 8 bytes."""
+        self.key = self._checked_key(key, (self.key_size,), "Dummy")
+
+    def encrypt_block(self, plaintext: bytes) -> bytes:
+        """XOR one block with the key, then reverse its bytes."""
+        block = self._checked_block(plaintext)
+        return self.bitwise_xor_bytes(block, self.key)[::-1]
+
+    def decrypt_block(self, ciphertext: bytes) -> bytes:
+        """Undo :meth:`encrypt_block`."""
+        block = self._checked_block(ciphertext)
+        return self.bitwise_xor_bytes(block[::-1], self.key)
 
 
 class PermutationHelperTestCase(unittest.TestCase):
@@ -213,41 +238,137 @@ class MalformedPaddingTestCase(unittest.TestCase):
 class TypeAndLengthGuardTestCase(unittest.TestCase):
     """str is rejected outright and hex is never guessed."""
 
-    def test_as_bytes_rejects_str(self):
-        """_as_bytes refuses str rather than parsing it as hex."""
-        with self.assertRaises(TypeError):
-            DummyCipher._as_bytes("00ff", "block")
+    KEY = bytes(range(1, 9))
+    BLOCK = b"12345678"
 
-    def test_as_bytes_accepts_bytearray(self):
-        """bytearray is accepted and normalised to bytes."""
-        self.assertEqual(DummyCipher._as_bytes(bytearray(b"ab"), "block"),
-                         b"ab")
+    def setUp(self):
+        """Build a keyed cipher."""
+        self.cipher = DummyCipher()
+        self.cipher.generate_keys(self.KEY)
 
-    def test_checked_key_enforces_length(self):
-        """_checked_key accepts only the listed sizes."""
-        self.assertEqual(DummyCipher._checked_key(bytes(8), (8,), "test"), bytes(8))
-        with self.assertRaises(ValueError):
-            DummyCipher._checked_key(bytes(7), (8,), "test")
-
-    def test_checked_key_rejects_str(self):
+    def test_key_rejects_str(self):
         """A str key is a TypeError, not a ValueError."""
         with self.assertRaises(TypeError):
-            DummyCipher._checked_key("00" * 8, (8,), "test")
+            self.cipher.generate_keys("00" * 8)
 
-    def test_checked_block_enforces_one_block(self):
-        """_checked_block accepts exactly block_size bytes."""
-        cipher = DummyCipher()
-        self.assertEqual(cipher._checked_block(bytes(8)), bytes(8))
+    def test_key_enforces_length(self):
+        """Only the listed key sizes are accepted."""
         for n in (0, 7, 9):
             with self.subTest(size=n):
                 with self.assertRaises(ValueError):
-                    cipher._checked_block(bytes(n))
+                    self.cipher.generate_keys(bytes(n))
+
+    def test_key_accepts_bytearray(self):
+        """A bytearray key is normalised to bytes."""
+        self.cipher.generate_keys(bytearray(self.KEY))
+        self.assertEqual(self.cipher.key, self.KEY)
+
+    def test_block_rejects_str(self):
+        """Block methods refuse str rather than parsing it as hex."""
+        for method in (self.cipher.encrypt_block, self.cipher.decrypt_block):
+            with self.subTest(method=method.__name__):
+                with self.assertRaises(TypeError):
+                    method("0011223344556677")
+
+    def test_block_enforces_one_block(self):
+        """Block methods accept exactly block_size bytes."""
+        for method in (self.cipher.encrypt_block, self.cipher.decrypt_block):
+            for n in (0, 7, 9):
+                with self.subTest(method=method.__name__, size=n):
+                    with self.assertRaises(ValueError):
+                        method(bytes(n))
+
+    def test_block_accepts_bytearray(self):
+        """A bytearray block gives the same result as bytes."""
+        self.assertEqual(self.cipher.encrypt_block(bytearray(self.BLOCK)),
+                         self.cipher.encrypt_block(self.BLOCK))
+
+    def test_block_round_trip(self):
+        """decrypt_block undoes encrypt_block, and encryption changes the data."""
+        encrypted = self.cipher.encrypt_block(self.BLOCK)
+        self.assertNotEqual(encrypted, self.BLOCK)
+        self.assertEqual(self.cipher.decrypt_block(encrypted), self.BLOCK)
+
+    def test_message_methods_reject_str(self):
+        """encrypt and decrypt refuse str for the data and the IV."""
+        iv = bytes(8)
+        cases = (
+            (self.cipher.encrypt, ("abc", "CBC", "PKCS", iv)),
+            (self.cipher.encrypt, (b"abc", "CBC", "PKCS", "00" * 8)),
+            (self.cipher.decrypt, ("abc", "CBC", "PKCS", iv)),
+            (self.cipher.decrypt, (bytes(8), "CBC", "PKCS", "00" * 8)),
+        )
+        for method, args in cases:
+            with self.subTest(method=method.__name__, args=args):
+                with self.assertRaises(TypeError):
+                    method(*args)
+
+    def test_message_methods_accept_bytearray(self):
+        """bytearray data and IV behave exactly like bytes."""
+        iv = bytes(range(8))
+        expected = self.cipher.encrypt(b"abc", "CBC", "PKCS", iv)
+        self.assertEqual(
+            self.cipher.encrypt(bytearray(b"abc"), "CBC", "PKCS", bytearray(iv)),
+            expected)
+        self.assertEqual(
+            self.cipher.decrypt(bytearray(expected), "CBC", "PKCS",
+                                bytearray(iv)),
+            b"abc")
+
+
+class BlockModeRoundTripTestCase(unittest.TestCase):
+    """Every mode round trips through the toy cipher."""
+
+    MODES = ("ECB", "CBC", "PCBC", "CFB", "OFB", "CTR")
+    LENGTHS = (0, 1, 7, 8, 9, 20)
+
+    def setUp(self):
+        """Build a keyed cipher."""
+        self.cipher = DummyCipher()
+        self.cipher.generate_keys(bytes(range(1, 9)))
+
+    def test_modes_round_trip(self):
+        """decrypt(encrypt(x)) == x for every mode and message length."""
+        for mode in self.MODES:
+            iv = b"" if mode == "ECB" else bytes(range(8))
+            for length in self.LENGTHS:
+                with self.subTest(mode=mode, length=length):
+                    message = bytes(range(length))
+                    encrypted = self.cipher.encrypt(message, mode, "PKCS", iv)
+                    self.assertEqual(
+                        self.cipher.decrypt(encrypted, mode, "PKCS", iv),
+                        message)
+
+    def test_iv_rules(self):
+        """ECB rejects an IV; every other mode needs one full block."""
+        with self.assertRaises(ValueError):
+            self.cipher.encrypt(b"abc", "ECB", "PKCS", bytes(8))
+        for mode in self.MODES[1:]:
+            with self.subTest(mode=mode):
+                with self.assertRaises(ValueError):
+                    self.cipher.encrypt(b"abc", mode, "PKCS", b"short")
+
+    def test_unknown_mode_rejected(self):
+        """An unrecognised mode is an error in both directions."""
+        with self.assertRaises(ValueError):
+            self.cipher.encrypt(b"abc", "GCM", "PKCS", bytes(8))
+        with self.assertRaises(ValueError):
+            self.cipher.decrypt(bytes(8), "GCM", "PKCS", bytes(8))
+
+    def test_partial_block_ciphertext_rejected(self):
+        """Block-mode ciphertext must be a whole number of blocks."""
+        with self.assertRaises(ValueError):
+            self.cipher.decrypt(bytes(9), "CBC", "PKCS", bytes(8))
+
+
+class BaseClassPlaceholderTestCase(unittest.TestCase):
+    """EncryptionBase's own block methods are pass-through placeholders."""
 
     def test_placeholder_block_methods_pass_through(self):
-        """The base class block methods are pass-through placeholders."""
-        cipher = DummyCipher()
-        self.assertEqual(cipher.encrypt_block(b"12345678"), b"12345678")
-        self.assertEqual(cipher.decrypt_block(b"12345678"), b"12345678")
+        """With no cipher behind it, the base class returns its input."""
+        base = EncryptionBase()
+        self.assertEqual(base.encrypt_block(b"12345678"), b"12345678")
+        self.assertEqual(base.decrypt_block(b"12345678"), b"12345678")
 
 
 if __name__ == "__main__":
