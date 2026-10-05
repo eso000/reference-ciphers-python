@@ -4,14 +4,19 @@ from .encryption_base import EncryptionBase
 
 # The Serpent S-box tables (SBOXES) are in the appendix at the end of this file.
 
-# Golden-ratio constant used by the key schedule (Serpent proposal,
-# Section 3.2). This is the standard value 0x9E3779B9 with its bits reversed
-# (0x9D9EEC79), because this implementation works on bit-reversed words.
-PHI = 2644438137
+# Fractional part of the golden ratio, 2^32 * ((sqrt(5) - 1) / 2), mixed into
+# the prekey recurrence of the key schedule (Serpent proposal, Section 4).
+PHI = 0x9E3779B9
 
 
 class Serpent(EncryptionBase):
     """Serpent cipher; 128-bit blocks and keys, 32 rounds.
+
+    The rounds follow the bitslice description of the Serpent proposal: the
+    cipher (Section 3) and the key schedule (Section 4). A block is held as
+    four 32-bit words in little-endian bit order, so the paper's ``<<<`` and
+    ``<<`` are plain :meth:`rotl` and masked left shifts on those words.
+    Python integers do not wrap, hence the ``& 0xFFFFFFFF`` after each shift.
 
     ``use_alt`` selects the S-box implementation: ``True`` (default) uses the
     word-sliced gate networks in apply_sbox (fast), ``False`` uses the
@@ -30,37 +35,23 @@ class Serpent(EncryptionBase):
         return self.apply_sbox(x, n, d) if self.use_alt else self.apply_sbox_bit(x, n, d)
 
     @staticmethod
-    def _bitrev8(v):
-        """Reverse bits in an 8-bit value (bit-reversal of one byte)."""
-        r = 0
-        for _ in range(8):
-            r = (r << 1) | (v & 1)
-            v >>= 1
-        return r
+    def _bytes_to_words(data: bytes):
+        """Split bytes into 32-bit words, 4 bytes per word, little-endian.
+
+        That is Serpent's bit order: the first bit of the block ends up as the
+        least significant bit of word 0 (Serpent proposal, Section 3.3)."""
+        return [int.from_bytes(data[i : i + 4], "little") for i in range(0, len(data), 4)]
 
     @staticmethod
-    def _bytes_to_words_bitrev(data: bytes):
-        """Convert bytes to 32-bit words with bit-reversal per byte.
-        Each 4 bytes become one word."""
-        out = []
-        for i in range(0, len(data), 4):
-            w = 0
-            for byte in data[i : i + 4]:
-                w = (w << 8) | Serpent._bitrev8(byte)
-            out.append(w)
-        return out
-
-    @staticmethod
-    def _words_to_bytes_bitrev(words) -> bytes:
-        """Convert 32-bit words to bytes with bit-reversal per byte."""
-        out = bytearray()
-        for w in words:
-            for shift in (24, 16, 8, 0):
-                out.append(Serpent._bitrev8((w >> shift) & 0xFF))
-        return bytes(out)
+    def _words_to_bytes(words) -> bytes:
+        """Pack 32-bit words back into bytes, 4 bytes per word, little-endian."""
+        return b"".join(w.to_bytes(4, "little") for w in words)
 
     def apply_sbox_bit(self, x, n, d=0):
-        """Bit-sliced S-box: apply S-box n to four 32-bit bit-planes."""
+        """Bit-sliced S-box: apply S-box n to four 32-bit bit-planes.
+
+        Bit k of each word is one of the 32 parallel copies of the 4-bit S-box
+        that the paper runs on a single block (Section 2.1)."""
         xn = [0, 0, 0, 0]
         for bit in range(32):
             newbits = SBOXES[d][n][
@@ -428,60 +419,73 @@ class Serpent(EncryptionBase):
         target = 32
         if len(key) < target:
             key = key + b"\x01" + b"\x00" * (target - len(key) - 1)
-        w = self._bytes_to_words_bitrev(key)
+        # Prekey recurrence (Section 4):
+        #     w_i := (w_i-8 ^ w_i-5 ^ w_i-3 ^ w_i-1 ^ PHI ^ i) <<< 11
+        # where the eight key words are w_-8 .. w_-1, so w[8:] holds w_0 .. w_131.
+        w = self._bytes_to_words(key)
         for i in range(8, 140):
-            wi = w[i - 8] ^ w[i - 5] ^ w[i - 3] ^ w[i - 1] ^ PHI ^ self._bitrev32(i - 8)
-            wi = self.rotr(wi, 11, 32)
+            wi = w[i - 8] ^ w[i - 5] ^ w[i - 3] ^ w[i - 1] ^ PHI ^ (i - 8)
+            wi = self.rotl(wi, 11, 32)
             w.append(wi)
+        # Subkey i is prekeys 4i .. 4i+3 run through S-box (3 - i) mod 8, which
+        # is the S3, S2, S1, S0, S7, S6, S5, S4 order listed in Section 4.
         sk1 = []
         for i in range(33):
             k = self._sbox(
                 [w[4 * i + 8], w[4 * i + 1 + 8], w[4 * i + 2 + 8], w[4 * i + 3 + 8]],
-                (((32 + 3 - i) % 32) % 8),
+                (3 - i) % 8,
             )
             sk1.append(k)
         self.subkeys = sk1
 
-    @staticmethod
-    def _bitrev32(v):
-        """Reverse bits in a 32-bit value (bit-reversal of one word)."""
-        r = 0
-        for _ in range(32):
-            r = (r << 1) | (v & 1)
-            v >>= 1
-        return r
-
     def lt(self, x):
-        """Linear Transformation (diffusion) applied between rounds."""
-        x[0] = self.rotr(x[0], 13, 32)
-        x[2] = self.rotr(x[2], 3, 32)
+        """Linear Transformation (diffusion) applied between rounds.
+
+        A transcription of the paper's listing (Section 3):
+
+            X0 := X0 <<< 13
+            X2 := X2 <<< 3
+            X1 := X1 ^ X0 ^ X2
+            X3 := X3 ^ X2 ^ (X0 << 3)
+            X1 := X1 <<< 1
+            X3 := X3 <<< 7
+            X0 := X0 ^ X1 ^ X3
+            X2 := X2 ^ X3 ^ (X1 << 7)
+            X0 := X0 <<< 5
+            X2 := X2 <<< 22
+        """
+        x[0] = self.rotl(x[0], 13, 32)
+        x[2] = self.rotl(x[2], 3, 32)
         x[1] = x[1] ^ x[0] ^ x[2]
-        x[3] = x[3] ^ x[2] ^ (x[0] >> 3)
-        x[1] = self.rotr(x[1], 1, 32)
-        x[3] = self.rotr(x[3], 7, 32)
+        x[3] = x[3] ^ x[2] ^ ((x[0] << 3) & 0xFFFFFFFF)
+        x[1] = self.rotl(x[1], 1, 32)
+        x[3] = self.rotl(x[3], 7, 32)
         x[0] = x[0] ^ x[1] ^ x[3]
-        x[2] = x[2] ^ x[3] ^ (x[1] >> 7)
-        x[0] = self.rotr(x[0], 5, 32)
-        x[2] = self.rotr(x[2], 22, 32)
+        x[2] = x[2] ^ x[3] ^ ((x[1] << 7) & 0xFFFFFFFF)
+        x[0] = self.rotl(x[0], 5, 32)
+        x[2] = self.rotl(x[2], 22, 32)
         return x
 
     def lt_inverse(self, x):
-        """Inverse Linear Transformation, used by decryption."""
-        x[2] = self.rotl(x[2], 22, 32)
-        x[0] = self.rotl(x[0], 5, 32)
-        x[2] = x[2] ^ x[3] ^ (x[1] >> 7)
+        """Inverse Linear Transformation, used by decryption.
+
+        The same ten steps as lt in reverse order, with every rotation turned
+        around, which is the paper's inverse transformation."""
+        x[2] = self.rotr(x[2], 22, 32)
+        x[0] = self.rotr(x[0], 5, 32)
+        x[2] = x[2] ^ x[3] ^ ((x[1] << 7) & 0xFFFFFFFF)
         x[0] = x[0] ^ x[1] ^ x[3]
-        x[3] = self.rotl(x[3], 7, 32)
-        x[1] = self.rotl(x[1], 1, 32)
-        x[3] = x[3] ^ x[2] ^ (x[0] >> 3)
+        x[3] = self.rotr(x[3], 7, 32)
+        x[1] = self.rotr(x[1], 1, 32)
+        x[3] = x[3] ^ x[2] ^ ((x[0] << 3) & 0xFFFFFFFF)
         x[1] = x[1] ^ x[0] ^ x[2]
-        x[2] = self.rotl(x[2], 3, 32)
-        x[0] = self.rotl(x[0], 13, 32)
+        x[2] = self.rotr(x[2], 3, 32)
+        x[0] = self.rotr(x[0], 13, 32)
         return x
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Encrypt one 128-bit block given as bytes."""
-        x = self._bytes_to_words_bitrev(self._checked_block(plaintext))
+        x = self._bytes_to_words(self._checked_block(plaintext))
         for r in range(32):
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
             x = self._sbox(x, r % 8)
@@ -489,19 +493,19 @@ class Serpent(EncryptionBase):
                 break
             x = self.lt(x)
         x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
-        return self._words_to_bytes_bitrev(x)
+        return self._words_to_bytes(x)
 
     def decrypt_block(self, ciphertext: bytes) -> bytes:
         """Decrypt one 128-bit block given as bytes."""
-        x = self._bytes_to_words_bitrev(self._checked_block(ciphertext))
+        x = self._bytes_to_words(self._checked_block(ciphertext))
         x = [x[i] ^ self.subkeys[32][i] for i in range(4)]
-        x = self._sbox(x, 31 % 8, d=1)
+        x = self._sbox(x, 7, d=1)  # the last round used S7
         x = [x[i] ^ self.subkeys[31][i] for i in range(4)]
         for r in range(30, -1, -1):
             x = self.lt_inverse(x)
             x = self._sbox(x, r % 8, d=1)
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
-        return self._words_to_bytes_bitrev(x)
+        return self._words_to_bytes(x)
 
 #
 # ---- Serpent data tables (appendix) ----
