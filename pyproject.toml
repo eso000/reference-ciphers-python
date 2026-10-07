@@ -20,7 +20,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# Independent oracles used by verify_vectors.py (pycrypto is the old name,
+# Independent oracles used by examples/verify_vectors.py (pycrypto is the old name,
 # pycryptodome is the maintained fork providing the same Crypto.Cipher API).
 oracle = ["pycryptodome"]
 
