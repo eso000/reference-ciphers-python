@@ -95,8 +95,8 @@ Lengths are checked strictly and never silently adjusted; a wrong length raises
 The test suite uses `unittest`, so it runs with the standard library alone:
 
 ```bash
-python3 -m unittest discover -s tests -t .   # everything
-python3 -m unittest tests.test_aes -v        # one module
+python3 -m unittest discover -s tests -t tests   # everything
+python3 -m unittest tests.test_aes -v             # one module
 ```
 
 | Module | Covers |
@@ -108,9 +108,9 @@ python3 -m unittest tests.test_aes -v        # one module
 | `tests/test_serpent.py` | the NESSIE/verified sets, plus S-box cross-checks |
 | `tests/test_encryption_base.py` | padding schemes and shared helpers |
 | `tests/test_modes.py` | all six modes, padding and length validation |
-| `tests/vectors.py` | the vector data itself, shared with `verify_vectors.py` |
+| `tests/vectors.py` | the vector data itself, shared with `examples/verify_vectors.py` |
 
-`verify_vectors.py` is a cross-implementation harness. It always runs the
+`examples/verify_vectors.py` is a cross-implementation harness. It always runs the
 in-repo ciphers against the official vectors, then additionally cross-checks
 them against any of these external libraries found on the machine:
 
@@ -124,15 +124,48 @@ Libraries that are not installed are reported as `SKIP`; the exit code is
 non-zero only when a vector actually fails.
 
 ```bash
-python3 verify_vectors.py
+python3 -m examples.verify_vectors
+python3 -m examples.benchmark
 ```
+
+Both are run as modules (`python3 -m ...`) from the repository root, so that
+the repository root ends up on `sys.path` and the `src` and `tests` imports
+resolve.
+
+### Benchmark
+
+`examples/benchmark.py` times every cipher three ways: key setup, the raw
+`encrypt_block`/`decrypt_block` cost, and every mode in both directions. Where
+an external library is installed it is timed too, which puts a number on what
+the pure-Python implementations cost. Each figure is the best of `--rounds`
+runs after a warm-up, measured with `time.perf_counter()` over the bytes the
+call actually processed (so the padded modes are not flattered).
+
+```bash
+python3 -m examples.benchmark                       # everything, 4000 bytes
+python3 -m examples.benchmark --bytes 65536         # bigger message
+python3 -m examples.benchmark --rounds 9            # steadier figures
+python3 -m examples.benchmark --cipher AES --mode CBC --mode CTR
+python3 -m examples.benchmark --no-native           # skip the C libraries
+python3 -m examples.benchmark --json                # machine-readable
+```
+
+Two results worth noting, because they are counter-intuitive. **Blowfish is the
+fastest cipher here, roughly 13x AES**, because it works on 64-bit blocks and
+its rounds are table lookups, whereas AES spends its rounds in GF(2^8)
+multiplication. And the native figures are labelled `bulk` or `block`:
+pycryptodome is handed the whole message in one call, while nettle and
+libtomcrypt only expose single-block ECB entry points, so those rows are
+dominated by ctypes call overhead and are not a like-for-like comparison.
+Absolute numbers are machine- and build-specific; only the ordering within one
+run is meaningful.
 
 ## Requirements
 
 - Python 3.10+
 - No third-party packages required to use the ciphers or run the built-in tests.
 - Optional: pycrypto (or pycryptodome), libtomcrypt, and GNU nettle to enable
-  the independent oracle checks in `verify_vectors.py`.
+  the independent oracle checks in `examples/verify_vectors.py`.
 
 ## Project layout
 
@@ -148,7 +181,7 @@ src/
   Serpent.py           Serpent implementation
 
 tests/
-  vectors.py           Published known-answer vectors, shared with verify_vectors.py
+  vectors.py           Published known-answer vectors, shared with examples/verify_vectors.py
   test_aes.py          FIPS-197 and SP 800-38A
   test_des.py          DES vectors, permutation cross-checks, 3DES EDE properties
   test_blowfish.py     Schneier's official ECB and set_key sets
@@ -157,8 +190,11 @@ tests/
   test_encryption_base.py  Padding schemes and shared helpers
   test_modes.py        All block modes, padding and length validation
 
-verify_vectors.py    In-repo + external-oracle verification harness
-benchmark.py         Timing script for the ciphers
+examples/
+  verify_vectors.py    In-repo + external-oracle verification harness
+  benchmark.py         Timing script: all ciphers, all modes, both directions,
+                       plus any installed native library for comparison
+
 pylintrc             Lint configuration for the teaching-style code
 ```
 

@@ -1,7 +1,7 @@
 """Published known-answer test vectors for every cipher in the repo.
 
 This is the single source of truth for vector data: the unit tests under
-``tests/`` and the cross-implementation harness ``verify_vectors.py`` both
+``tests/`` and the harness ``examples/verify_vectors.py`` both
 import from here, so a vector is only ever written down once.
 
 Provenance
