@@ -1,9 +1,37 @@
 # Cryptology (Python)
 
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen)
+
 From-scratch, dependency-free implementations of six classic block ciphers in
-pure Python. The goal is clarity and correctness: every primitive is written
-out step by step, and every cipher is checked against the official published
-test vectors and, when available, against independent crypto libraries.
+pure Python — written to be read. Every primitive is spelled out step by step,
+and every cipher is checked against the official published test vectors, against
+an independent implementation of the same math, and, where available, against a
+third-party crypto library used as an oracle.
+
+## Background
+
+AES and DES have no shortage of reference implementations to check against. The
+other ciphers are less forgiving: with fewer trustworthy references, getting
+them right took far more rigorous debugging. This repo grew out of that — one
+clean, from-scratch implementation per cipher, plus a test suite strict enough
+to demonstrate correctness rather than merely assert it.
+
+## Highlights
+
+- **Six ciphers, zero dependencies** — AES, DES, 3DES, Blowfish, Twofish and
+  Serpent, all in pure standard-library Python 3.10+.
+- **Verified three ways** — published known-answer vectors, two independent
+  implementations cross-checked against each other (DES/3DES and Serpent), and
+  external crypto libraries (pycryptodome, libtomcrypt, nettle) used as
+  independent oracles.
+- **Six block modes** — ECB, CBC, PCBC, CFB, OFB and CTR, shared by every cipher
+  through a single base class.
+- **Strict, predictable API** — bytes in, bytes out; wrong lengths raise
+  `ValueError`, hex strings raise `TypeError`, and nothing is silently adjusted.
+- **Written to be read** — internals follow the specifications rather than
+  micro-optimized tricks.
 
 ## Ciphers
 
@@ -16,31 +44,10 @@ test vectors and, when available, against independent crypto libraries.
 | Twofish   | 128 bit    | 128 / 192 / 256  | AES submission (Schneier et al.)      |
 | Serpent   | 128 bit    | 128 / 192 / 256  | NESSIE finalist (Anderson et al.)     |
 
-## Architecture
+## Quick start
 
-All ciphers share one abstract base class, `EncryptionBase` in
-`src/encryption_base.py`. It provides the common building blocks (XOR, bit
-permutations, rotations, padding) and the block-mode `encrypt` / `decrypt`,
-which take and return `bytes`.
-
-Each cipher subclasses it, declares its block size, and implements three methods:
-
-```python
-block_size = 16                   # class attribute, bytes
-generate_keys(key)               # key schedule (bytes)
-encrypt_block(plaintext)  -> bytes
-decrypt_block(ciphertext) -> bytes
-```
-
-Internals follow the specifications rather than optimized tricks:
-
-- **AES** – GF(2^8) arithmetic (`xtime`, `gmul`), SubBytes/ShiftRows/MixColumns, key expansion.
-- **DES** – integer-based bit permutations/expansion and a Feistel `f` function; `TripleDES` is EDE.
-- **Blowfish** – full on-spec P-array and S-box tables, 16-round Feistel.
-- **Twofish** – GF polynomial multiplication, MDS matrices, PHT, q-boxes.
-- **Serpent** – bit-reversed words, bit-sliced S-box boolean circuits, linear transform.
-
-## Usage
+Run from the repository root; the `src` package is imported directly, so there is
+no install step:
 
 ```python
 from src import AES
@@ -51,46 +58,82 @@ c.encrypt_block(bytes.fromhex("00112233445566778899aabbccddeeff")).hex()
 # '69c4e0d86a7b0430d8cdb78070b4c55a'
 ```
 
-Keys, plaintext, ciphertext and IVs are all `bytes` (a `str`, including a hex
-string, raises `TypeError`). `encrypt` / `decrypt` handle arbitrary-length data.
-Default mode is CBC with ISO 7816-4 padding.
+For whole messages, `encrypt` / `decrypt` handle any length. The default mode is
+CBC with ISO 7816-4 padding:
 
 ```python
 import os
 
-iv = os.urandom(16)   # fresh, unpredictable, one block long
+iv = os.urandom(16)                      # fresh, unpredictable, one block long
 ct = c.encrypt(b"attack at dawn", mode="CBC", padding="ISO 7816-4", iv=iv)
 pt = c.decrypt(ct, mode="CBC", padding="ISO 7816-4", iv=iv)
 # b'attack at dawn'
 ```
 
+## Architecture
+
+All ciphers share one base class, `EncryptionBase` in
+`src/encryption_base.py`. It provides the common building blocks (byte-level
+XOR, bit permutations, rotations, padding) and the block-mode `encrypt` /
+`decrypt`, which take and return `bytes`.
+
+Each cipher subclasses it, declares its block size, and implements three methods:
+
+```python
+class MyCipher(EncryptionBase):
+    block_size = 16                       # bytes; one block
+
+    def generate_keys(self, key):         # key schedule
+        ...
+    def encrypt_block(self, plaintext):   # exactly one block -> bytes
+        ...
+    def decrypt_block(self, ciphertext):  # exactly one block -> bytes
+        ...
+```
+
+Internals follow the specifications rather than optimized tricks:
+
+- **AES** — GF(2^8) arithmetic (`xtime`, `gmul`), SubBytes/ShiftRows/MixColumns,
+  key expansion.
+- **DES** — integer-based bit permutations and expansion with a Feistel `f`
+  function; `TripleDES` wraps three DES layers in EDE order.
+- **Blowfish** — the full on-spec P-array and S-box tables, 16-round Feistel.
+- **Twofish** — GF polynomial multiplication, MDS matrices, PHT and q-boxes.
+- **Serpent** — bit-reversed words, bit-sliced S-box boolean circuits and the
+  linear transform.
+
+## API contract
+
+Keys, plaintext, ciphertext and IVs are all `bytes`. A `str` — including a hex
+string — raises `TypeError`, so there is no ambiguity about encoding.
+`encrypt` / `decrypt` handle arbitrary-length data; `encrypt_block` /
+`decrypt_block` take and return exactly one block.
+
 Lengths are checked strictly and never silently adjusted; a wrong length raises
 `ValueError`:
 
-- **Keys:** AES, Twofish and Serpent take exactly 16, 24 or 32 bytes (Serpent
-  applies the spec's `0x01` padding to 16/24-byte keys internally), DES 8,
-  3DES 24, Blowfish 4–56.
-- **Blocks:** `encrypt_block` / `decrypt_block` take exactly one block.
-- **IVs:** every mode except ECB needs an IV of exactly one block (for CTR, the
-  initial counter block). ECB rejects an IV. There is no default IV.
+- **Keys** — AES, Twofish and Serpent: exactly 16, 24 or 32 bytes (Serpent
+  applies the specification's `0x01` padding to 16- and 24-byte keys
+  internally). DES: 8. 3DES: 24. Blowfish: 4–56.
+- **Blocks** — exactly one block per `encrypt_block` / `decrypt_block` call.
+- **IVs** — every mode except ECB needs an IV of exactly one block (for CTR,
+  the initial counter block). ECB rejects an IV. There is no default IV.
 
 ## Modes and padding
 
-- Modes: **ECB, CBC, PCBC, CFB, OFB, CTR**.
-- Padding depends on the mode:
-  - **ECB, CBC, PCBC** work on whole blocks, so the message is always padded,
-    including block-aligned input (a full extra block is added). This makes
-    unpadding unambiguous. Schemes: `PKCS`, `ANSI X9.23`, `ISO 7816-4` (`bit`),
-    `TBC`, and `0`/`byt` zero padding (fills to the block boundary only, so it
-    cannot be removed again). `padding=""` means no padding and requires
-    block-aligned input.
-  - **CFB, OFB, CTR** are keystream modes: no padding, and the ciphertext has
-    exactly the length of the plaintext.
-  - Malformed padding or a ciphertext that is not block-aligned raises
-    `ValueError`.
-- Block-level API (`encrypt_block` / `decrypt_block`) takes exactly one block.
+- **Modes:** ECB, CBC, PCBC, CFB, OFB, CTR.
+- **ECB, CBC and PCBC** operate on whole blocks, so the message is always padded
+  — even block-aligned input receives a full extra block, which makes unpadding
+  unambiguous. Schemes: `PKCS`, `ANSI X9.23`, `ISO 7816-4` (`bit`), `TBC`, and
+  `0`/`byt` zero padding (fills to the block boundary only, so it cannot be
+  removed again). `padding=""` means no padding and requires block-aligned
+  input.
+- **CFB, OFB and CTR** are keystream modes: no padding, and the ciphertext is
+  exactly as long as the plaintext.
+- Malformed padding, or a ciphertext that is not block-aligned, raises
+  `ValueError`.
 
-## Verification
+## Testing and verification
 
 The test suite uses `unittest`, so it runs with the standard library alone:
 
@@ -110,36 +153,41 @@ python3 -m unittest tests.test_aes -v             # one module
 | `tests/test_modes.py` | all six modes, padding and length validation |
 | `tests/vectors.py` | the vector data itself, shared with `examples/verify_vectors.py` |
 
-`examples/verify_vectors.py` is a cross-implementation harness. It always runs the
-in-repo ciphers against the official vectors, then additionally cross-checks
-them against any of these external libraries found on the machine:
+### Cross-implementation harness
 
-| Library      | Ciphers checked              | Loaded as            |
-|--------------|------------------------------|----------------------|
-| pycrypto     | AES, DES, 3DES, Blowfish     | `Crypto.Cipher`      |
-| libtomcrypt  | Twofish                      | `libtomcrypt.so.1`   |
-| GNU nettle   | Serpent                      | `libnettle.so.8`     |
+`examples/verify_vectors.py` runs the in-repo ciphers against the official
+vectors, then additionally cross-checks them against any of the following
+external libraries found on the machine:
 
-Libraries that are not installed are reported as `SKIP`; the exit code is
-non-zero only when a vector actually fails.
+| Library      | Ciphers checked       | Loaded as          |
+|--------------|-----------------------|--------------------|
+| pycrypto     | AES, DES, Blowfish    | `Crypto.Cipher`    |
+| libtomcrypt  | Twofish               | `libtomcrypt.so.1` |
+| GNU nettle   | Serpent               | `libnettle.so.8`   |
+
+Libraries that are not installed are reported as `SKIP`, and the exit code is
+non-zero only when a vector actually fails. Triple DES is absent by design: it
+has no vector of confirmed provenance here, so `tests/test_des.py` checks it
+structurally instead (EDE layer order, key-split assignment, and the collapse to
+single DES when all three keys match). Every other cipher and every vector is
+traceable to a publication.
 
 ```bash
 python3 -m examples.verify_vectors
 python3 -m examples.benchmark
 ```
 
-Both are run as modules (`python3 -m ...`) from the repository root, so that
-the repository root ends up on `sys.path` and the `src` and `tests` imports
-resolve.
+Both are run as modules (`python3 -m ...`) from the repository root, so the
+repository root ends up on `sys.path` and the `src` and `tests` imports resolve.
 
 ### Benchmark
 
 `examples/benchmark.py` times every cipher three ways: key setup, the raw
 `encrypt_block`/`decrypt_block` cost, and every mode in both directions. Where
-an external library is installed it is timed too, which puts a number on what
-the pure-Python implementations cost. Each figure is the best of `--rounds`
-runs after a warm-up, measured with `time.perf_counter()` over the bytes the
-call actually processed (so the padded modes are not flattered).
+an external library is installed it is timed too, putting a number on what the
+pure-Python implementations cost. Each figure is the best of `--rounds` runs
+after a warm-up, measured with `time.perf_counter()` over the bytes the call
+actually processed (so the padded modes are not flattered).
 
 ```bash
 python3 -m examples.benchmark                       # everything, 4000 bytes
@@ -150,22 +198,15 @@ python3 -m examples.benchmark --no-native           # skip the C libraries
 python3 -m examples.benchmark --json                # machine-readable
 ```
 
-Two results worth noting, because they are counter-intuitive. **Blowfish is the
-fastest cipher here, roughly 13x AES**, because it works on 64-bit blocks and
-its rounds are table lookups, whereas AES spends its rounds in GF(2^8)
+Two results are worth noting because they are counter-intuitive. **Blowfish is
+the fastest cipher here, roughly 13x AES**, because it works on 64-bit blocks
+and its rounds are table lookups, whereas AES spends its rounds in GF(2^8)
 multiplication. And the native figures are labelled `bulk` or `block`:
 pycryptodome is handed the whole message in one call, while nettle and
 libtomcrypt only expose single-block ECB entry points, so those rows are
 dominated by ctypes call overhead and are not a like-for-like comparison.
 Absolute numbers are machine- and build-specific; only the ordering within one
 run is meaningful.
-
-## Requirements
-
-- Python 3.10+
-- No third-party packages required to use the ciphers or run the built-in tests.
-- Optional: pycrypto (or pycryptodome), libtomcrypt, and GNU nettle to enable
-  the independent oracle checks in `examples/verify_vectors.py`.
 
 ## Project layout
 
@@ -198,19 +239,20 @@ examples/
 pylintrc             Lint configuration for the teaching-style code
 ```
 
-Every cipher and every vector in `tests/vectors.py` is traceable to a
-publication. Triple DES is the one exception: it has no vector of confirmed
-provenance here, so `tests/test_des.py` checks it structurally (EDE layer
-order, key-split assignment, the collapse to single DES when all three keys
-match) rather than against an expected ciphertext.
+## Requirements
+
+- Python 3.10+
+- No third-party packages are required to use the ciphers or run the built-in
+  tests.
+- Optional: pycrypto (or pycryptodome), libtomcrypt and GNU nettle enable the
+  independent oracle checks in `examples/verify_vectors.py`.
 
 ## Security notice
 
 This is an educational, from-scratch implementation. It implements classic
-block modes (ECB/CBC/PCBC/CFB/OFB/CTR), has no key derivation, no
-authenticated encryption (no MAC/AEAD), and makes no constant-time claims.
-Do not use it to protect real secrets — use a vetted library such as
-`cryptography` instead.
+block modes (ECB/CBC/PCBC/CFB/OFB/CTR), has no key derivation, no authenticated
+encryption (no MAC/AEAD), and makes no constant-time claims. Do not use it to
+protect real secrets — use a vetted library such as `cryptography` instead.
 
 ## License
 
