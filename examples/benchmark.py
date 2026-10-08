@@ -85,7 +85,7 @@ class NativeOracle:
         entry point. The result is dominated by ctypes overhead.
     """
 
-    
+
 
     def __init__(self, name, library, block_size, granularity, enc, dec):
         self.name = name
