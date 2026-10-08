@@ -8,6 +8,7 @@ gate network (apply_sbox, the default) and the bit-sliced table path
 ciphers (AltAgreementTestMixin), and the SBOXES appendix must hold the
 4-bit permutations the paper specifies.
 """
+
 import random
 import unittest
 
@@ -18,12 +19,14 @@ from tests.vectors import SERPENT_KATS
 
 class SerpentKATTestCase(base.BlockKATTestMixin):
     """NESSIE/verified single-block vectors on the default gate-network path."""
+
     CipherClass = Serpent
     BLOCK_KATS = SERPENT_KATS
 
 
 class SerpentAltTestCase(base.AltAgreementTestMixin):
     """The gate network and the bit-sliced path compute the same cipher."""
+
     CipherClass = Serpent
     KEY_SIZES = (16, 24, 32)
 
@@ -73,8 +76,10 @@ class SerpentSBoxTestCase(unittest.TestCase):
             words = self.random_words()
             for box in range(8):
                 with self.subTest(box=box, words=words):
-                    self.assertEqual(cipher.apply_sbox(list(words), box, d=0),
-                                     cipher.apply_sbox_bit(list(words), box, d=0))
+                    self.assertEqual(
+                        cipher.apply_sbox(list(words), box, d=0),
+                        cipher.apply_sbox_bit(list(words), box, d=0),
+                    )
 
     def test_gate_matches_table_inverse(self):
         """apply_sbox agrees with apply_sbox_bit in the inverse direction."""
@@ -83,8 +88,10 @@ class SerpentSBoxTestCase(unittest.TestCase):
             words = self.random_words()
             for box in range(8):
                 with self.subTest(box=box, words=words):
-                    self.assertEqual(cipher.apply_sbox(list(words), box, d=1),
-                                     cipher.apply_sbox_bit(list(words), box, d=1))
+                    self.assertEqual(
+                        cipher.apply_sbox(list(words), box, d=1),
+                        cipher.apply_sbox_bit(list(words), box, d=1),
+                    )
 
     def test_inverse_is_inverse_of_forward(self):
         """Applying the table path forward then inverse is the identity."""

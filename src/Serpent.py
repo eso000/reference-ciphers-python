@@ -32,7 +32,9 @@ class Serpent(EncryptionBase):
 
     def _sbox(self, x, n, d=0):
         """Dispatch to the selected S-box implementation."""
-        return self.apply_sbox(x, n, d) if self.use_alt else self.apply_sbox_bit(x, n, d)
+        return (
+            self.apply_sbox(x, n, d) if self.use_alt else self.apply_sbox_bit(x, n, d)
+        )
 
     @staticmethod
     def _bytes_to_words(data: bytes):
@@ -40,7 +42,9 @@ class Serpent(EncryptionBase):
 
         That is Serpent's bit order: the first bit of the block ends up as the
         least significant bit of word 0 (Serpent proposal, Section 3.3)."""
-        return [int.from_bytes(data[i : i + 4], "little") for i in range(0, len(data), 4)]
+        return [
+            int.from_bytes(data[i : i + 4], "little") for i in range(0, len(data), 4)
+        ]
 
     @staticmethod
     def _words_to_bytes(words) -> bytes:
@@ -506,6 +510,7 @@ class Serpent(EncryptionBase):
             x = self._sbox(x, r % 8, d=1)
             x = [x[i] ^ self.subkeys[r][i] for i in range(4)]
         return self._words_to_bytes(x)
+
 
 #
 # ---- Serpent data tables (appendix) ----

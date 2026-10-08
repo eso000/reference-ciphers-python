@@ -46,14 +46,14 @@ class PermutationHelperTestCase(unittest.TestCase):
     def test_bitwise_xor_bytes(self):
         """XOR pairs corresponding bytes up to the shorter length."""
         self.assertEqual(
-            DummyCipher.bitwise_xor_bytes(b"\x0f\xf0", b"\xff\xff"),
-            b"\xf0\x0f")
+            DummyCipher.bitwise_xor_bytes(b"\x0f\xf0", b"\xff\xff"), b"\xf0\x0f"
+        )
 
     def test_bitwise_xor_bytes_stops_at_shorter(self):
         """A length mismatch truncates rather than raising."""
         self.assertEqual(
-            DummyCipher.bitwise_xor_bytes(b"\x01\x02\x03", b"\x01"),
-            b"\x00")
+            DummyCipher.bitwise_xor_bytes(b"\x01\x02\x03", b"\x01"), b"\x00"
+        )
 
     def test_permutate_int(self):
         """Bits are picked out in the order the table lists them.
@@ -72,8 +72,9 @@ class PermutationHelperTestCase(unittest.TestCase):
 
     def test_permutate_int_identity_table(self):
         """Listing bits most-significant first is the identity."""
-        self.assertEqual(DummyCipher.permutate_int(0xA5, [1, 2, 3, 4, 5, 6, 7, 8],
-                                                   8), 0xA5)
+        self.assertEqual(
+            DummyCipher.permutate_int(0xA5, [1, 2, 3, 4, 5, 6, 7, 8], 8), 0xA5
+        )
 
     def test_rotl(self):
         """rotl wraps bits around within the given width."""
@@ -122,13 +123,11 @@ class PadUnpadRoundTripTestCase(unittest.TestCase):
 
     def pad(self, data, scheme, mode="CBC"):
         """Pad ``data`` for ``scheme`` under ``mode``."""
-        return self.cipher.pad_for_mode(data, self.cipher.block_size,
-                                        mode, scheme)
+        return self.cipher.pad_for_mode(data, self.cipher.block_size, mode, scheme)
 
     def unpad(self, data, scheme, mode="CBC"):
         """Remove ``scheme`` padding from ``data``."""
-        return self.cipher.unpad_for_mode(data, self.cipher.block_size,
-                                          mode, scheme)
+        return self.cipher.unpad_for_mode(data, self.cipher.block_size, mode, scheme)
 
     def test_reversible_schemes_round_trip(self):
         """Each scheme pads to the next boundary and comes back intact."""
@@ -195,14 +194,12 @@ class MalformedPaddingTestCase(unittest.TestCase):
 
     def unpad(self, data, scheme):
         """Remove ``scheme`` padding from ``data``."""
-        return self.cipher.unpad_for_mode(data, self.cipher.block_size,
-                                          "CBC", scheme)
+        return self.cipher.unpad_for_mode(data, self.cipher.block_size, "CBC", scheme)
 
     def test_pkcs_count_out_of_range(self):
         """A padding byte larger than the block is invalid."""
         with self.assertRaises(ValueError):
-            self.unpad(bytes([self.cipher.block_size + 1]) + self.block,
-                       "PKCS")
+            self.unpad(bytes([self.cipher.block_size + 1]) + self.block, "PKCS")
 
     def test_pkcs_zero_count(self):
         """A padding count of zero is invalid."""
@@ -280,8 +277,10 @@ class TypeAndLengthGuardTestCase(unittest.TestCase):
 
     def test_block_accepts_bytearray(self):
         """A bytearray block gives the same result as bytes."""
-        self.assertEqual(self.cipher.encrypt_block(bytearray(self.BLOCK)),
-                         self.cipher.encrypt_block(self.BLOCK))
+        self.assertEqual(
+            self.cipher.encrypt_block(bytearray(self.BLOCK)),
+            self.cipher.encrypt_block(self.BLOCK),
+        )
 
     def test_block_round_trip(self):
         """decrypt_block undoes encrypt_block, and encryption changes the data."""
@@ -309,11 +308,12 @@ class TypeAndLengthGuardTestCase(unittest.TestCase):
         expected = self.cipher.encrypt(b"abc", "CBC", "PKCS", iv)
         self.assertEqual(
             self.cipher.encrypt(bytearray(b"abc"), "CBC", "PKCS", bytearray(iv)),
-            expected)
+            expected,
+        )
         self.assertEqual(
-            self.cipher.decrypt(bytearray(expected), "CBC", "PKCS",
-                                bytearray(iv)),
-            b"abc")
+            self.cipher.decrypt(bytearray(expected), "CBC", "PKCS", bytearray(iv)),
+            b"abc",
+        )
 
 
 class BlockModeRoundTripTestCase(unittest.TestCase):
@@ -336,8 +336,8 @@ class BlockModeRoundTripTestCase(unittest.TestCase):
                     message = bytes(range(length))
                     encrypted = self.cipher.encrypt(message, mode, "PKCS", iv)
                     self.assertEqual(
-                        self.cipher.decrypt(encrypted, mode, "PKCS", iv),
-                        message)
+                        self.cipher.decrypt(encrypted, mode, "PKCS", iv), message
+                    )
 
     def test_iv_rules(self):
         """ECB rejects an IV; every other mode needs one full block."""
