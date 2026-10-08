@@ -3,70 +3,37 @@
 Vectors: the official Twofish KATs (Schneier et al., B.2) for 128/192/256-bit
 keys; the 128 chain continues the all-zero ciphertext as the next plaintext.
 """
-
 import unittest
 
 from src.Twofish import Twofish
+from tests import cipher_test_base as base
 from tests.vectors import TWOFISH_KATS
 
 
-class TwofishKATTestCase(unittest.TestCase):
+class TwofishKATTestCase(base.BlockKATTestMixin):
     """The five official single-block vectors."""
-
-    def test_encrypt(self):
-        """Encrypt every official vector."""
-        for i, (key, pt, ct) in enumerate(TWOFISH_KATS):
-            with self.subTest(vector=f"kat {i + 1:02d}"):
-                cipher = Twofish()
-                cipher.generate_keys(bytes.fromhex(key))
-                self.assertEqual(cipher.encrypt_block(bytes.fromhex(pt)),
-                                 bytes.fromhex(ct))
-
-    def test_decrypt(self):
-        """Decrypt every official vector."""
-        for i, (key, pt, ct) in enumerate(TWOFISH_KATS):
-            with self.subTest(vector=f"kat {i + 1:02d}"):
-                cipher = Twofish()
-                cipher.generate_keys(bytes.fromhex(key))
-                self.assertEqual(cipher.decrypt_block(bytes.fromhex(ct)),
-                                 bytes.fromhex(pt))
+    CipherClass = Twofish
+    BLOCK_KATS = TWOFISH_KATS
 
 
-class TwofishRoundTripTestCase(unittest.TestCase):
-    """Multi-block round trips and padding."""
-
+class TwofishRoundTripTestCase(base.CBCRoundTripTestMixin):
+    """Multi-block round trips through ECB and CBC."""
+    CipherClass = Twofish
     KEYS = (
         ("128-bit", "000102030405060708090a0b0c0d0e0f"),
         ("192-bit", "000102030405060708090a0b0c0d0e0f1011121314151617"),
         ("256-bit",
          "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"),
     )
-
-    def test_ecb_round_trip_all_key_sizes(self):
-        """Two blocks round trip through ECB for 128/192/256-bit keys."""
-        for name, key in self.KEYS:
-            with self.subTest(key_size=name):
-                cipher = Twofish()
-                cipher.generate_keys(bytes.fromhex(key))
-                pt = bytes(0xA5 + i for i in range(32))
-                ct = cipher.encrypt(pt, mode="ECB")
-                self.assertNotEqual(ct, pt)
-                self.assertEqual(cipher.decrypt(ct, mode="ECB"), pt)
-
-    def test_cbc_round_trip(self):
-        """Two blocks round trip through CBC with an explicit IV."""
-        cipher = Twofish()
-        cipher.generate_keys(bytes.fromhex("0123456789abcdef0123456789abcdef"))
-        pt = bytes(range(32))
-        iv = b"\xaa" * 16
-        ct = cipher.encrypt(pt, mode="CBC", iv=iv)
-        self.assertNotEqual(ct, pt)
-        self.assertEqual(cipher.decrypt(ct, mode="CBC", iv=iv), pt)
+    ECB_PT_LEN = 32
+    CBC_KEY = "0123456789abcdef0123456789abcdef"
+    CBC_IV = "aa" * 16
+    CBC_PT_SEED = 0x00
+    CBC_PT_LEN = 32
 
 
 class TwofishPaddingTestCase(unittest.TestCase):
     """PKCS#7 padding on 16-byte blocks."""
-
     def setUp(self):
         """Load a fixed key into a fresh cipher."""
         self.cipher = Twofish()
