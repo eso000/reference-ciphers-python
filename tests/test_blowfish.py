@@ -1,10 +1,11 @@
 """Unit tests for Blowfish against Schneier's official published vectors."""
+
 import unittest
 
 from src.Blowfish import Blowfish
 from tests import cipher_test_base as base
-from tests.vectors import (BLOWFISH_OFFICIAL, BLOWFISH_SET_KEY,
-                           BLOWFISH_SET_KEY_PT)
+from tests.vectors import BLOWFISH_OFFICIAL, BLOWFISH_SET_KEY, BLOWFISH_SET_KEY_PT
+
 
 def _build_blowfish_kats():
     """Collect the official ECB and set_key vectors as (name, key, pt, ct).
@@ -25,12 +26,14 @@ _BLOWFISH_KATS = _build_blowfish_kats()
 
 class BlowfishKATTestCase(base.BlockKATTestMixin):
     """The official ECB set and the official set_key vectors."""
+
     CipherClass = Blowfish
     BLOCK_KATS = _BLOWFISH_KATS
 
 
 class BlowfishRoundTripTestCase(base.CBCRoundTripTestMixin):
     """Multi-block round trips through ECB and CBC."""
+
     CipherClass = Blowfish
     KEYS = (("blowfish", "0123456789abcdef"),)
     ECB_PT_LEN = 24
@@ -42,6 +45,7 @@ class BlowfishRoundTripTestCase(base.CBCRoundTripTestMixin):
 
 class BlowfishPaddingTestCase(unittest.TestCase):
     """PKCS#7 padding on 8-byte blocks."""
+
     KEY = "AABB09182736CCDD"
 
     def test_pkcs7_padding(self):

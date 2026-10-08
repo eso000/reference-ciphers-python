@@ -28,6 +28,7 @@ KEY_SIZES = (
     (Serpent, (16, 24, 32)),
 )
 
+
 # One keyed instance per cipher for the mode and padding sweeps.
 def keyed_ciphers():
     """Return (label, cipher) pairs with a usable key already generated."""
@@ -63,11 +64,13 @@ class BlockModesTestCase(unittest.TestCase):
             for idx, mode in enumerate(MODES):
                 with self.subTest(cipher=label, mode=mode):
                     iv = mode_iv(
-                        mode, bytes((0x20 + idx + j) & 0xFF for j in range(size)))
+                        mode, bytes((0x20 + idx + j) & 0xFF for j in range(size))
+                    )
                     ct = cipher.encrypt(pt, mode=mode, padding="", iv=iv)
                     self.assertNotEqual(ct, pt)
                     self.assertEqual(
-                        cipher.decrypt(ct, mode=mode, padding="", iv=iv), pt)
+                        cipher.decrypt(ct, mode=mode, padding="", iv=iv), pt
+                    )
 
 
 class InputValidationTestCase(unittest.TestCase):
@@ -116,8 +119,11 @@ class InputValidationTestCase(unittest.TestCase):
             cipher = _keyed(cls, "00" * _valid[0])
             with self.subTest(cipher=cls.__name__):
                 with self.assertRaises(ValueError):
-                    cipher.encrypt(bytes(cipher.block_size), mode="ECB",
-                                   iv=bytes(cipher.block_size))
+                    cipher.encrypt(
+                        bytes(cipher.block_size),
+                        mode="ECB",
+                        iv=bytes(cipher.block_size),
+                    )
 
     def test_cbc_requires_iv(self):
         """The default mode is CBC and it refuses to invent an IV."""
@@ -144,8 +150,9 @@ class InputValidationTestCase(unittest.TestCase):
             by_array.generate_keys(bytearray(key))
             block = bytes(by_bytes.block_size)
             with self.subTest(cipher=name):
-                self.assertEqual(by_array.encrypt_block(block),
-                                 by_bytes.encrypt_block(block))
+                self.assertEqual(
+                    by_array.encrypt_block(block), by_bytes.encrypt_block(block)
+                )
 
 
 class PaddingTestCase(unittest.TestCase):
@@ -153,16 +160,14 @@ class PaddingTestCase(unittest.TestCase):
 
     def messages(self, block_size):
         """Plaintexts of every interesting length plus padding look-alikes."""
-        lengths = (0, 1, block_size - 1, block_size, block_size + 1,
-                   2 * block_size)
+        lengths = (0, 1, block_size - 1, block_size, block_size + 1, 2 * block_size)
         lookalikes = (
             b"A" * (block_size - 1) + b"\x80",
             b"A" * (block_size - 1) + b"\x01",
             b"A" * (block_size - 1) + b"\xff",
             b"\x00" * block_size,
         )
-        generated = [bytes((i * 11 + 5) & 0x7F for i in range(n))
-                     for n in lengths]
+        generated = [bytes((i * 11 + 5) & 0x7F for i in range(n)) for n in lengths]
         return generated + list(lookalikes)
 
     def test_block_modes_always_pad(self):
@@ -173,16 +178,16 @@ class PaddingTestCase(unittest.TestCase):
             for mode in PADDED_MODES:
                 for scheme in SCHEMES:
                     for pt in self.messages(size):
-                        with self.subTest(cipher=label, mode=mode,
-                                          padding=scheme, length=len(pt)):
+                        with self.subTest(
+                            cipher=label, mode=mode, padding=scheme, length=len(pt)
+                        ):
                             miv = mode_iv(mode, iv)
-                            ct = cipher.encrypt(pt, mode=mode, padding=scheme,
-                                                iv=miv)
+                            ct = cipher.encrypt(pt, mode=mode, padding=scheme, iv=miv)
+                            self.assertEqual(len(ct), (len(pt) // size + 1) * size)
                             self.assertEqual(
-                                len(ct), (len(pt) // size + 1) * size)
-                            self.assertEqual(
-                                cipher.decrypt(ct, mode=mode, padding=scheme,
-                                               iv=miv), pt)
+                                cipher.decrypt(ct, mode=mode, padding=scheme, iv=miv),
+                                pt,
+                            )
 
     def test_stream_modes_are_unpadded(self):
         """Keystream modes preserve the plaintext length exactly."""
@@ -191,12 +196,10 @@ class PaddingTestCase(unittest.TestCase):
             iv = bytes(range(size))
             for mode in STREAM_MODES:
                 for pt in self.messages(size):
-                    with self.subTest(cipher=label, mode=mode,
-                                      length=len(pt)):
+                    with self.subTest(cipher=label, mode=mode, length=len(pt)):
                         ct = cipher.encrypt(pt, mode=mode, iv=iv)
                         self.assertEqual(len(ct), len(pt))
-                        self.assertEqual(
-                            cipher.decrypt(ct, mode=mode, iv=iv), pt)
+                        self.assertEqual(cipher.decrypt(ct, mode=mode, iv=iv), pt)
 
     def test_str_input_rejected_bytearray_accepted(self):
         """str is never guessed as hex; bytearray is accepted."""

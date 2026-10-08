@@ -60,7 +60,7 @@ class AES(EncryptionBase):
 
         w = []
         for i in range(0, len(key_bytes), 4):
-            w.append(list(key_bytes[i:i+4]))
+            w.append(list(key_bytes[i : i + 4]))
 
         rcon = [1, 0, 0, 0]
         for i in range(n_words, 4 * rounds):
@@ -82,7 +82,7 @@ class AES(EncryptionBase):
         # Convert to list of 16-byte round keys
         self.subkeys = []
         for i in range(0, len(w), 4):
-            round_key = w[i] + w[i+1] + w[i+2] + w[i+3]
+            round_key = w[i] + w[i + 1] + w[i + 2] + w[i + 3]
             self.subkeys.append(round_key)
 
     def shift_rows(self, state: list[int]) -> list[int]:
@@ -93,47 +93,71 @@ class AES(EncryptionBase):
         # Row 2: shift left 2
         # Row 3: shift left 3
         return [
-            state[0], state[5], state[10], state[15],  # row 0
-            state[4], state[9], state[14], state[3],   # row 1
-            state[8], state[13], state[2], state[7],   # row 2
-            state[12], state[1], state[6], state[11],  # row 3
+            state[0],
+            state[5],
+            state[10],
+            state[15],  # row 0
+            state[4],
+            state[9],
+            state[14],
+            state[3],  # row 1
+            state[8],
+            state[13],
+            state[2],
+            state[7],  # row 2
+            state[12],
+            state[1],
+            state[6],
+            state[11],  # row 3
         ]
 
     def inv_shift_rows(self, state: list[int]) -> list[int]:
         """Inverse of shift_rows, used by decryption."""
         return [
-            state[0], state[13], state[10], state[7],   # row 0
-            state[4], state[1], state[14], state[11],   # row 1
-            state[8], state[5], state[2], state[15],    # row 2
-            state[12], state[9], state[6], state[3],    # row 3
+            state[0],
+            state[13],
+            state[10],
+            state[7],  # row 0
+            state[4],
+            state[1],
+            state[14],
+            state[11],  # row 1
+            state[8],
+            state[5],
+            state[2],
+            state[15],  # row 2
+            state[12],
+            state[9],
+            state[6],
+            state[3],  # row 3
         ]
 
     def mix_columns(self, state: list[int]) -> list[int]:
         """Mix each state column with the circulant matrix over GF(2^8)."""
         out = [0] * 16
         for c in range(4):
-            s0 = state[c*4]
-            s1 = state[c*4 + 1]
-            s2 = state[c*4 + 2]
-            s3 = state[c*4 + 3]
-            out[c*4] = gmul(2, s0) ^ gmul(3, s1) ^ s2 ^ s3
-            out[c*4 + 1] = s0 ^ gmul(2, s1) ^ gmul(3, s2) ^ s3
-            out[c*4 + 2] = s0 ^ s1 ^ gmul(2, s2) ^ gmul(3, s3)
-            out[c*4 + 3] = gmul(3, s0) ^ s1 ^ s2 ^ gmul(2, s3)
+            s0 = state[c * 4]
+            s1 = state[c * 4 + 1]
+            s2 = state[c * 4 + 2]
+            s3 = state[c * 4 + 3]
+            out[c * 4] = gmul(2, s0) ^ gmul(3, s1) ^ s2 ^ s3
+            out[c * 4 + 1] = s0 ^ gmul(2, s1) ^ gmul(3, s2) ^ s3
+            out[c * 4 + 2] = s0 ^ s1 ^ gmul(2, s2) ^ gmul(3, s3)
+            out[c * 4 + 3] = gmul(3, s0) ^ s1 ^ s2 ^ gmul(2, s3)
         return out
 
     def inv_mix_columns(self, state: list[int]) -> list[int]:
         """Inverse of mix_columns, used by decryption."""
         out = [0] * 16
         for c in range(4):
-            s0 = state[c*4]
-            s1 = state[c*4 + 1]
-            s2 = state[c*4 + 2]
-            s3 = state[c*4 + 3]
-            out[c*4] = gmul(14, s0) ^ gmul(11, s1) ^ gmul(13, s2) ^ gmul(9, s3)
-            out[c*4 + 1] = gmul(9, s0) ^ gmul(14, s1) ^ gmul(11, s2) ^ gmul(13, s3)
-            out[c*4 + 2] = gmul(13, s0) ^ gmul(9, s1) ^ gmul(14, s2) ^ gmul(11, s3)
-            out[c*4 + 3] = gmul(11, s0) ^ gmul(13, s1) ^ gmul(9, s2) ^ gmul(14, s3)
+            s0 = state[c * 4]
+            s1 = state[c * 4 + 1]
+            s2 = state[c * 4 + 2]
+            s3 = state[c * 4 + 3]
+            out[c * 4] = gmul(14, s0) ^ gmul(11, s1) ^ gmul(13, s2) ^ gmul(9, s3)
+            out[c * 4 + 1] = gmul(9, s0) ^ gmul(14, s1) ^ gmul(11, s2) ^ gmul(13, s3)
+            out[c * 4 + 2] = gmul(13, s0) ^ gmul(9, s1) ^ gmul(14, s2) ^ gmul(11, s3)
+            out[c * 4 + 3] = gmul(11, s0) ^ gmul(13, s1) ^ gmul(9, s2) ^ gmul(14, s3)
         return out
 
     def encrypt_block(self, plaintext: bytes) -> bytes:
@@ -163,6 +187,8 @@ class AES(EncryptionBase):
             state = self.inv_sub_bytes(state)
         state = self.add_round_key(state, self.subkeys[0])
         return bytes(state)
+
+
 #
 # ---- AES data tables (appendix) ----
 #

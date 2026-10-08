@@ -4,6 +4,7 @@ from .encryption_base import EncryptionBase
 
 # Blowfish data tables (PBOX, SBOXES) are in the appendix at the end of this file.
 
+
 class Blowfish(EncryptionBase):
     """Blowfish cipher; 64-bit blocks with variable-length keys (4-56 bytes)."""
 
@@ -92,6 +93,7 @@ class Blowfish(EncryptionBase):
         new_right = left ^ self.subkeys[1]
         new_left = right ^ self.subkeys[0]
         return (2**32 * new_left + new_right).to_bytes(8, "big")
+
 
 #
 # ---- Blowfish data tables (appendix) ----

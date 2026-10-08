@@ -9,8 +9,16 @@ each other, verifies that both use_alt settings compute the same cipher
 import random
 import unittest
 
-from src.DES import (DES, TripleDES, IP, FP, SPBOXES, _build_spboxes,
-                     ip_perm_alt, fp_perm_alt)
+from src.DES import (
+    DES,
+    TripleDES,
+    IP,
+    FP,
+    SPBOXES,
+    _build_spboxes,
+    ip_perm_alt,
+    fp_perm_alt,
+)
 from tests import cipher_test_base as base
 from tests.vectors import DES_KATS
 
@@ -81,8 +89,8 @@ class DSKATTestCase(unittest.TestCase):
                 cipher = DES()
                 cipher.generate_keys(bytes.fromhex(key))
                 self.assertEqual(
-                    cipher.encrypt_block(bytes.fromhex(pt)),
-                    bytes.fromhex(ct))
+                    cipher.encrypt_block(bytes.fromhex(pt)), bytes.fromhex(ct)
+                )
 
     def test_decrypt_kats(self):
         """Decrypt every vector with the default implementation."""
@@ -91,8 +99,8 @@ class DSKATTestCase(unittest.TestCase):
                 cipher = DES()
                 cipher.generate_keys(bytes.fromhex(key))
                 self.assertEqual(
-                    cipher.decrypt_block(bytes.fromhex(ct)),
-                    bytes.fromhex(pt))
+                    cipher.decrypt_block(bytes.fromhex(ct)), bytes.fromhex(pt)
+                )
 
 
 class DESImplementationAgreementTestCase(unittest.TestCase):
@@ -108,18 +116,19 @@ class DESImplementationAgreementTestCase(unittest.TestCase):
             half = rng.getrandbits(32)
             subkey = rng.getrandbits(48)
             with self.subTest(half=half, subkey=subkey):
-                self.assertEqual(cipher.f(half, subkey),
-                                 cipher.f_alt(half, subkey))
+                self.assertEqual(cipher.f(half, subkey), cipher.f_alt(half, subkey))
 
 
 class DESAltTestCase(base.AltAgreementTestMixin):
     """Both DES implementations compute the same cipher."""
+
     CipherClass = DES
     KEY_SIZES = (8,)
 
 
 class TripleDESAltTestCase(base.AltAgreementTestMixin):
     """Both Triple DES implementations compute the same cipher."""
+
     CipherClass = TripleDES
     KEY_SIZES = (24,)
 
@@ -151,8 +160,11 @@ class TripleDESEDETestCase(unittest.TestCase):
         """
         cipher = self.keyed((self.K1, self.K2, self.K3))
         single = DES()
-        for layer, key_hex in ((cipher.des1, self.K1), (cipher.des2, self.K2),
-                               (cipher.des3, self.K3)):
+        for layer, key_hex in (
+            (cipher.des1, self.K1),
+            (cipher.des2, self.K2),
+            (cipher.des3, self.K3),
+        ):
             single.generate_keys(bytes.fromhex(key_hex))
             self.assertEqual(layer.subkeys, single.subkeys)
 
@@ -165,10 +177,12 @@ class TripleDESEDETestCase(unittest.TestCase):
         cipher = self.keyed((self.K1, self.K1, self.K1))
         single = DES()
         single.generate_keys(bytes.fromhex(self.K1))
-        self.assertEqual(cipher.encrypt_block(self.BLOCK),
-                         single.encrypt_block(self.BLOCK))
-        self.assertEqual(cipher.decrypt_block(self.BLOCK),
-                         single.decrypt_block(self.BLOCK))
+        self.assertEqual(
+            cipher.encrypt_block(self.BLOCK), single.encrypt_block(self.BLOCK)
+        )
+        self.assertEqual(
+            cipher.decrypt_block(self.BLOCK), single.decrypt_block(self.BLOCK)
+        )
 
     def test_layers_are_encrypt_decrypt_encrypt(self):
         """The outer layers encrypt and the middle layer decrypts."""
@@ -181,8 +195,7 @@ class TripleDESEDETestCase(unittest.TestCase):
         step2 = single.decrypt_block(step1)
 
         single.generate_keys(bytes.fromhex(self.K3))
-        self.assertEqual(cipher.encrypt_block(self.BLOCK),
-                         single.encrypt_block(step2))
+        self.assertEqual(cipher.encrypt_block(self.BLOCK), single.encrypt_block(step2))
 
     def test_decrypt_is_the_inverse(self):
         """EDE decryption undoes EDE encryption on random blocks."""
@@ -191,12 +204,14 @@ class TripleDESEDETestCase(unittest.TestCase):
         for _ in range(64):
             block = rng.randbytes(8)
             with self.subTest(block=block):
-                self.assertEqual(cipher.decrypt_block(cipher.encrypt_block(block)),
-                                 block)
+                self.assertEqual(
+                    cipher.decrypt_block(cipher.encrypt_block(block)), block
+                )
 
 
 class DESRoundTripTestCase(base.CBCRoundTripTestMixin):
     """Multi-block round trips through ECB and CBC under single DES."""
+
     CipherClass = DES
     KEYS = (("DES", "AABB09182736CCDD"),)
     ECB_PT_LEN = 16
@@ -209,6 +224,7 @@ class DESRoundTripTestCase(base.CBCRoundTripTestMixin):
 
 class TripleDESRoundTripTestCase(base.CBCRoundTripTestMixin):
     """Multi-block round trips through ECB and CBC under Triple DES."""
+
     CipherClass = TripleDES
     KEYS = (("3DES", "AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c"),)
     ECB_PT_LEN = 16
@@ -221,6 +237,7 @@ class TripleDESRoundTripTestCase(base.CBCRoundTripTestMixin):
 
 class DESPaddingTestCase(unittest.TestCase):
     """PKCS#7 padding on 8-byte blocks."""
+
     KEY = "AABB09182736CCDD"
 
     def test_pkcs7_padding(self):

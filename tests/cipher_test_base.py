@@ -4,6 +4,7 @@ These mixins reduce duplication across KAT-style, round-trip and
 implementation-agreement tests while preserving clear subTest names so
 failures remain debuggable.
 """
+
 import random
 import unittest
 
@@ -20,7 +21,9 @@ def _normalize_block_kats(kats):
             normalized.append((str(name), str(key_hex), str(pt_hex), str(ct_hex)))
         elif len(item) == 3:
             key_hex, pt_hex, ct_hex = item
-            normalized.append((f"kat {i + 1:02d}", str(key_hex), str(pt_hex), str(ct_hex)))
+            normalized.append(
+                (f"kat {i + 1:02d}", str(key_hex), str(pt_hex), str(ct_hex))
+            )
         else:
             raise ValueError(f"Unexpected KAT format: {item!r}")
     return normalized
@@ -98,8 +101,9 @@ class ModeKATTestMixin(CipherTestBase):
                 cipher = self.make_cipher(key_hex)
                 got_ct = cipher.encrypt(pt, mode=mode, padding="", iv=iv).hex()
                 self.assertEqual(got_ct, ct_hex.lower())
-                got_pt = cipher.decrypt(bytes.fromhex(ct_hex), mode=mode,
-                                        padding="", iv=iv).hex()
+                got_pt = cipher.decrypt(
+                    bytes.fromhex(ct_hex), mode=mode, padding="", iv=iv
+                ).hex()
                 self.assertEqual(got_pt, self.PT_HEX.lower())
 
     def test_mode_kats(self):
@@ -135,8 +139,9 @@ class RoundTripTestMixin(CipherTestBase):
         plaintext = _pattern_bytes(self.ECB_PT_SEED, self.ECB_PT_LEN)
         for name, key_hex in self.KEYS:
             with self.subTest(key=name):
-                self._assert_round_trip(self.make_cipher(key_hex), plaintext,
-                                        mode="ECB")
+                self._assert_round_trip(
+                    self.make_cipher(key_hex), plaintext, mode="ECB"
+                )
 
 
 class CBCRoundTripTestMixin(RoundTripTestMixin):
@@ -163,8 +168,9 @@ class CBCRoundTripTestMixin(RoundTripTestMixin):
         pt_len = self.ECB_PT_LEN if self.CBC_PT_LEN is None else self.CBC_PT_LEN
         plaintext = _pattern_bytes(self.CBC_PT_SEED, pt_len)
         cipher = self.make_cipher(self.CBC_KEY)
-        self._assert_round_trip(cipher, plaintext, mode="CBC",
-                                iv=bytes.fromhex(self.CBC_IV))
+        self._assert_round_trip(
+            cipher, plaintext, mode="CBC", iv=bytes.fromhex(self.CBC_IV)
+        )
 
 
 class AltAgreementTestMixin(CipherTestBase):
@@ -204,8 +210,9 @@ class AltAgreementTestMixin(CipherTestBase):
                 with self.subTest(key_size=size, sample=sample):
                     left.generate_keys(key)
                     right.generate_keys(key)
-                    self.assertEqual(left.encrypt_block(block),
-                                     right.encrypt_block(block))
+                    self.assertEqual(
+                        left.encrypt_block(block), right.encrypt_block(block)
+                    )
 
     def test_decrypt_agrees(self):
         """Both implementations decrypt every sampled block identically."""
@@ -217,5 +224,6 @@ class AltAgreementTestMixin(CipherTestBase):
                 with self.subTest(key_size=size, sample=sample):
                     left.generate_keys(key)
                     right.generate_keys(key)
-                    self.assertEqual(left.decrypt_block(block),
-                                     right.decrypt_block(block))
+                    self.assertEqual(
+                        left.decrypt_block(block), right.decrypt_block(block)
+                    )

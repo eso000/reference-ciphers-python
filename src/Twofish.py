@@ -250,7 +250,7 @@ class Twofish(EncryptionBase):
         Twofish is little-endian: each 4-byte group is read with its
         least-significant byte first.
         """
-        return [int.from_bytes(data[i * 4:i * 4 + 4], "little") for i in range(4)]
+        return [int.from_bytes(data[i * 4 : i * 4 + 4], "little") for i in range(4)]
 
     @staticmethod
     def words_to_bytes_le(words: List[int]) -> bytes:
@@ -311,6 +311,7 @@ class Twofish(EncryptionBase):
         for i in range(4):
             x[i] = x[i] ^ self.subkeys[i]
         return self.words_to_bytes_le(x)
+
 
 #
 # ---- Twofish data tables (appendix) ----

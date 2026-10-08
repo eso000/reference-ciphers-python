@@ -143,7 +143,9 @@ class EncryptionBase:
         return bytes(value)
 
     @classmethod
-    def _checked_key(cls, key: bytes, sizes: Union[Iterable[int], range], label: str) -> bytes:
+    def _checked_key(
+        cls, key: bytes, sizes: Union[Iterable[int], range], label: str
+    ) -> bytes:
         """Return ``key`` as bytes, requiring its length to be in ``sizes``."""
         key = cls._as_bytes(key, "key")
         key_len = len(key)

@@ -7,4 +7,12 @@ from .Serpent import Serpent
 from .Twofish import Twofish
 from .encryption_base import EncryptionBase
 
-__all__ = ['AES', 'Blowfish', 'DES', 'TripleDES', 'Serpent', 'Twofish', 'EncryptionBase']
+__all__ = [
+    "AES",
+    "Blowfish",
+    "DES",
+    "TripleDES",
+    "Serpent",
+    "Twofish",
+    "EncryptionBase",
+]
