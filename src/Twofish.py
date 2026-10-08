@@ -74,9 +74,13 @@ class Twofish(EncryptionBase):
         x = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
         return self.sbox0[x[0]] ^ self.sbox1[x[1]] ^ self.sbox2[x[2]] ^ self.sbox3[x[3]]
 
-    def h(self, x: int, l0: List[List[int]]) -> int:
-        """Interleave q permutations with the key vector, then mix through the MDS matrix."""
-        x = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
+    def _h_mix(self, x: List[int], l0: List[List[int]]) -> List[int]:
+        """Apply h's q permutations and key whitening to four bytes.
+
+        Shared by :meth:`h` (round subkeys) and :meth:`generate_keys` (the
+        keyed S-boxes); returns the four mixed bytes before the MDS layer
+        (Twofish key schedule, Section 4.3.2).
+        """
         if len(l0) == 4:
             x[0] = self.q(x[0], 1) ^ l0[3][0]
             x[1] = self.q(x[1], 0) ^ l0[3][1]
@@ -87,23 +91,24 @@ class Twofish(EncryptionBase):
             x[1] = self.q(x[1], 1) ^ l0[2][1]
             x[2] = self.q(x[2], 0) ^ l0[2][2]
             x[3] = self.q(x[3], 0) ^ l0[2][3]
-
         x[0] = self.q(x[0], 0) ^ l0[1][0]
         x[1] = self.q(x[1], 1) ^ l0[1][1]
         x[2] = self.q(x[2], 0) ^ l0[1][2]
         x[3] = self.q(x[3], 1) ^ l0[1][3]
-
         x[0] = self.q(x[0], 0) ^ l0[0][0]
         x[1] = self.q(x[1], 0) ^ l0[0][1]
         x[2] = self.q(x[2], 1) ^ l0[0][2]
         x[3] = self.q(x[3], 1) ^ l0[0][3]
-
         x[0] = self.q(x[0], 1)
         x[1] = self.q(x[1], 0)
         x[2] = self.q(x[2], 1)
         x[3] = self.q(x[3], 0)
+        return x
 
-        return self.mds_lt_m([x[0], x[1], x[2], x[3]])
+    def h(self, x: int, l0: List[List[int]]) -> int:
+        """Interleave q permutations with the key vector, then mix through the MDS matrix."""
+        x = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
+        return self.mds_lt_m(self._h_mix(x, l0))
 
     def mds_lt_m(self, vec: List[int]) -> int:
         """Mix a 4-byte vector through the MDS matrix (Twofish, Section 2.2).
@@ -140,71 +145,12 @@ class Twofish(EncryptionBase):
         for l in s:
             l0.append([int((l / (2 ** (8 * (3 - i))) % (2**8))) for i in range(4)])
         l0 = l0[::-1]
-        x = [0, 0, 0, 0]
         s0 = [None] * 256
         s1 = [None] * 256
         s2 = [None] * 256
         s3 = [None] * 256
         for i in range(256):
-            if len(l0) == 4:
-                x[0] = self.q(i, 1) ^ l0[3][0]
-                x[1] = self.q(i, 0) ^ l0[3][1]
-                x[2] = self.q(i, 0) ^ l0[3][2]
-                x[3] = self.q(i, 1) ^ l0[3][3]
-                x[0] = self.q(x[0], 1) ^ l0[2][0]
-                x[1] = self.q(x[1], 1) ^ l0[2][1]
-                x[2] = self.q(x[2], 0) ^ l0[2][2]
-                x[3] = self.q(x[3], 0) ^ l0[2][3]
-                x[0] = self.q(x[0], 0) ^ l0[1][0]
-                x[1] = self.q(x[1], 1) ^ l0[1][1]
-                x[2] = self.q(x[2], 0) ^ l0[1][2]
-                x[3] = self.q(x[3], 1) ^ l0[1][3]
-
-                x[0] = self.q(x[0], 0) ^ l0[0][0]
-                x[1] = self.q(x[1], 0) ^ l0[0][1]
-                x[2] = self.q(x[2], 1) ^ l0[0][2]
-                x[3] = self.q(x[3], 1) ^ l0[0][3]
-
-                x[0] = self.q(x[0], 1)
-                x[1] = self.q(x[1], 0)
-                x[2] = self.q(x[2], 1)
-                x[3] = self.q(x[3], 0)
-
-            if len(l0) == 3:
-                x[0] = self.q(i, 1) ^ l0[2][0]
-                x[1] = self.q(i, 1) ^ l0[2][1]
-                x[2] = self.q(i, 0) ^ l0[2][2]
-                x[3] = self.q(i, 0) ^ l0[2][3]
-                x[0] = self.q(x[0], 0) ^ l0[1][0]
-                x[1] = self.q(x[1], 1) ^ l0[1][1]
-                x[2] = self.q(x[2], 0) ^ l0[1][2]
-                x[3] = self.q(x[3], 1) ^ l0[1][3]
-
-                x[0] = self.q(x[0], 0) ^ l0[0][0]
-                x[1] = self.q(x[1], 0) ^ l0[0][1]
-                x[2] = self.q(x[2], 1) ^ l0[0][2]
-                x[3] = self.q(x[3], 1) ^ l0[0][3]
-
-                x[0] = self.q(x[0], 1)
-                x[1] = self.q(x[1], 0)
-                x[2] = self.q(x[2], 1)
-                x[3] = self.q(x[3], 0)
-
-            if len(l0) == 2:
-                x[0] = self.q(i, 0) ^ l0[1][0]
-                x[1] = self.q(i, 1) ^ l0[1][1]
-                x[2] = self.q(i, 0) ^ l0[1][2]
-                x[3] = self.q(i, 1) ^ l0[1][3]
-                x[0] = self.q(x[0], 0) ^ l0[0][0]
-                x[1] = self.q(x[1], 0) ^ l0[0][1]
-                x[2] = self.q(x[2], 1) ^ l0[0][2]
-                x[3] = self.q(x[3], 1) ^ l0[0][3]
-
-                x[0] = self.q(x[0], 1)
-                x[1] = self.q(x[1], 0)
-                x[2] = self.q(x[2], 1)
-                x[3] = self.q(x[3], 0)
-
+            x = self._h_mix([i, i, i, i], l0)
             # Each keyed S-box folds one q-permuted byte through the MDS
             # matrix (row v -> byte lane v), giving a 32-bit look-up.
             s0[i] = self.mds_lt_m([x[0], 0, 0, 0])
