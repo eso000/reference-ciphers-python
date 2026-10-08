@@ -1,8 +1,9 @@
 """Unit tests for DES and Triple DES.
 
-Covers the classic published single-DES values, cross-checks the two
+Covers the classic published single-DES values, cross-checks the
 alternative IP/FP and f implementations against the spec tables and against
-each other, and exercises the 3DES vector plus round trips.
+each other, verifies that both use_alt settings compute the same cipher
+(DES and Triple DES), and exercises the 3DES vector plus round trips.
 """
 
 import random
@@ -73,31 +74,29 @@ class SPBoxTestCase(unittest.TestCase):
 class DSKATTestCase(unittest.TestCase):
     """The three classic single-DES known-answer vectors."""
 
-    def test_encrypt_both_implementations(self):
-        """Encrypt every KAT with the table and the alternative network."""
-        for use_alt in (True, False):
-            for i, (key, pt, ct) in enumerate(DES_KATS):
-                with self.subTest(use_alt=use_alt, vector=i + 1):
-                    cipher = DES(use_alt=use_alt)
-                    cipher.generate_keys(bytes.fromhex(key))
-                    self.assertEqual(
-                        cipher.encrypt_block(bytes.fromhex(pt)),
-                        bytes.fromhex(ct))
+    def test_encrypt_kats(self):
+        """Encrypt every vector with the default implementation."""
+        for i, (key, pt, ct) in enumerate(DES_KATS):
+            with self.subTest(vector=i + 1):
+                cipher = DES()
+                cipher.generate_keys(bytes.fromhex(key))
+                self.assertEqual(
+                    cipher.encrypt_block(bytes.fromhex(pt)),
+                    bytes.fromhex(ct))
 
-    def test_decrypt_both_implementations(self):
-        """Decrypt every KAT with the table and the alternative network."""
-        for use_alt in (True, False):
-            for i, (key, pt, ct) in enumerate(DES_KATS):
-                with self.subTest(use_alt=use_alt, vector=i + 1):
-                    cipher = DES(use_alt=use_alt)
-                    cipher.generate_keys(bytes.fromhex(key))
-                    self.assertEqual(
-                        cipher.decrypt_block(bytes.fromhex(ct)),
-                        bytes.fromhex(pt))
+    def test_decrypt_kats(self):
+        """Decrypt every vector with the default implementation."""
+        for i, (key, pt, ct) in enumerate(DES_KATS):
+            with self.subTest(vector=i + 1):
+                cipher = DES()
+                cipher.generate_keys(bytes.fromhex(key))
+                self.assertEqual(
+                    cipher.decrypt_block(bytes.fromhex(ct)),
+                    bytes.fromhex(pt))
 
 
 class DESImplementationAgreementTestCase(unittest.TestCase):
-    """The fast and the naive implementations compute the same thing."""
+    """The alternative round function matches the table-driven one."""
 
     SAMPLES = 500
 
@@ -112,18 +111,17 @@ class DESImplementationAgreementTestCase(unittest.TestCase):
                 self.assertEqual(cipher.f(half, subkey),
                                  cipher.f_alt(half, subkey))
 
-    def test_block_output_matches(self):
-        """Both implementations agree on every KAT, encrypt and decrypt."""
-        for key, pt, _ in DES_KATS:
-            with self.subTest(key=key):
-                fast = DES(use_alt=True)
-                naive = DES(use_alt=False)
-                fast.generate_keys(bytes.fromhex(key))
-                naive.generate_keys(bytes.fromhex(key))
-                self.assertEqual(fast.encrypt_block(bytes.fromhex(pt)),
-                                 naive.encrypt_block(bytes.fromhex(pt)))
-                self.assertEqual(fast.decrypt_block(bytes.fromhex(pt)),
-                                 naive.decrypt_block(bytes.fromhex(pt)))
+
+class DESAltTestCase(base.AltAgreementTestMixin):
+    """Both DES implementations compute the same cipher."""
+    CipherClass = DES
+    KEY_SIZES = (8,)
+
+
+class TripleDESAltTestCase(base.AltAgreementTestMixin):
+    """Both Triple DES implementations compute the same cipher."""
+    CipherClass = TripleDES
+    KEY_SIZES = (24,)
 
 
 class TripleDESEDETestCase(unittest.TestCase):
