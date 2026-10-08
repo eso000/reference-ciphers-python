@@ -1,8 +1,10 @@
 """Reusable base classes and helpers for cipher unit tests.
 
-These mixins reduce duplication across KAT-style and round-trip tests while
-preserving clear subTest names so failures remain debuggable.
+These mixins reduce duplication across KAT-style, round-trip and
+implementation-agreement tests while preserving clear subTest names so
+failures remain debuggable.
 """
+import random
 import unittest
 
 
@@ -163,3 +165,57 @@ class CBCRoundTripTestMixin(RoundTripTestMixin):
         cipher = self.make_cipher(self.CBC_KEY)
         self._assert_round_trip(cipher, plaintext, mode="CBC",
                                 iv=bytes.fromhex(self.CBC_IV))
+
+
+class AltAgreementTestMixin(CipherTestBase):
+    """Mixin for ciphers that ship two implementations of the same math.
+
+    ``use_alt=True`` (the default) and ``use_alt=False`` must produce
+    identical output for the same key and block. The known-answer tests
+    anchor the default path to the published vectors; this mixin transfers
+    that correctness to the alternative path by direct comparison.
+
+    Subclasses must set:
+        CipherClass: a cipher class whose ``__init__`` accepts ``use_alt``
+        KEY_SIZES: key lengths in bytes to sample (e.g. (16, 24, 32))
+
+    Optional:
+        SAMPLES: seeded random (key, block) pairs per key size (default 64)
+    """
+
+    KEY_SIZES = ()
+    SAMPLES = 64
+
+    def setUp(self):
+        """Seed a reproducible generator so failures are debuggable."""
+        self.rng = random.Random(11)
+
+    def alt_pair(self):
+        """Return a default (``use_alt=True``) and an alternative cipher."""
+        return self.CipherClass(use_alt=True), self.CipherClass(use_alt=False)
+
+    def test_encrypt_agrees(self):
+        """Both implementations encrypt every sampled block identically."""
+        left, right = self.alt_pair()
+        for size in self.KEY_SIZES:
+            for sample in range(self.SAMPLES):
+                key = self.rng.randbytes(size)
+                block = self.rng.randbytes(self.CipherClass.block_size)
+                with self.subTest(key_size=size, sample=sample):
+                    left.generate_keys(key)
+                    right.generate_keys(key)
+                    self.assertEqual(left.encrypt_block(block),
+                                     right.encrypt_block(block))
+
+    def test_decrypt_agrees(self):
+        """Both implementations decrypt every sampled block identically."""
+        left, right = self.alt_pair()
+        for size in self.KEY_SIZES:
+            for sample in range(self.SAMPLES):
+                key = self.rng.randbytes(size)
+                block = self.rng.randbytes(self.CipherClass.block_size)
+                with self.subTest(key_size=size, sample=sample):
+                    left.generate_keys(key)
+                    right.generate_keys(key)
+                    self.assertEqual(left.decrypt_block(block),
+                                     right.decrypt_block(block))

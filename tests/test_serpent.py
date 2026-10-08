@@ -4,8 +4,9 @@ The vector sets (sets 1-4, 128/192/256-bit keys) are as published by
 Biham et al., in the standard little-endian octet order that GNU nettle uses.
 The tests also cross-check the two S-box implementations: the word-sliced
 gate network (apply_sbox, the default) and the bit-sliced table path
-(apply_sbox_bit, use_alt=False) must agree, and the SBOXES appendix must
-hold the 4-bit permutations the paper specifies.
+(apply_sbox_bit, use_alt=False) must agree both as functions and as whole
+ciphers (AltAgreementTestMixin), and the SBOXES appendix must hold the
+4-bit permutations the paper specifies.
 """
 import random
 import unittest
@@ -20,24 +21,11 @@ class SerpentKATTestCase(base.BlockKATTestMixin):
     CipherClass = Serpent
     BLOCK_KATS = SERPENT_KATS
 
-    def test_table_path_reproduces_vectors(self):
-        """The bit-sliced table path (use_alt=False) reproduces every vector.
 
-        The mixin KATs above only exercise the default word-sliced gate
-        network. Running the whole cipher through the alternative bit-sliced
-        path proves the two S-box implementations are wired into the rounds
-        identically, not just that they agree in isolation.
-        """
-        for name, key_hex, pt_hex, ct_hex in SERPENT_KATS:
-            with self.subTest(vector=name):
-                cipher = Serpent(use_alt=False)
-                cipher.generate_keys(bytes.fromhex(key_hex))
-                self.assertEqual(
-                    cipher.encrypt_block(bytes.fromhex(pt_hex)),
-                    bytes.fromhex(ct_hex))
-                self.assertEqual(
-                    cipher.decrypt_block(bytes.fromhex(ct_hex)),
-                    bytes.fromhex(pt_hex))
+class SerpentAltTestCase(base.AltAgreementTestMixin):
+    """The gate network and the bit-sliced path compute the same cipher."""
+    CipherClass = Serpent
+    KEY_SIZES = (16, 24, 32)
 
 
 class SerpentSBoxTestCase(unittest.TestCase):
