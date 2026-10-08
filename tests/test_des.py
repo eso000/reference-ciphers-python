@@ -10,6 +10,7 @@ import unittest
 
 from src.DES import (DES, TripleDES, IP, FP, SPBOXES, _build_spboxes,
                      ip_perm_alt, fp_perm_alt)
+from tests import cipher_test_base as base
 from tests.vectors import DES_KATS
 
 
@@ -196,47 +197,38 @@ class TripleDESEDETestCase(unittest.TestCase):
                                  block)
 
 
-class DESRoundTripTestCase(unittest.TestCase):
-    """Multi-block round trips for DES and Triple DES."""
+class DESRoundTripTestCase(base.CBCRoundTripTestMixin):
+    """Multi-block round trips through ECB and CBC under single DES."""
+    CipherClass = DES
+    KEYS = (("DES", "AABB09182736CCDD"),)
+    ECB_PT_LEN = 16
+    ECB_PT_SEED = 0x10
+    CBC_KEY = "AABB09182736CCDD"
+    CBC_IV = "0000000000000000"
+    CBC_PT_SEED = 0xA0
+    CBC_PT_LEN = 16
 
-    DES_KEY = "AABB09182736CCDD"
-    DES3_KEY = "AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c"
 
-    def test_des_ecb_round_trip(self):
-        """Two blocks round trip through ECB."""
-        cipher = DES()
-        cipher.generate_keys(bytes.fromhex(self.DES_KEY))
-        pt = bytes(0x10 + i for i in range(16))
-        ct = cipher.encrypt(pt, mode="ECB")
-        self.assertNotEqual(ct, pt)
-        self.assertEqual(cipher.decrypt(ct, mode="ECB"), pt)
+class TripleDESRoundTripTestCase(base.CBCRoundTripTestMixin):
+    """Multi-block round trips through ECB and CBC under Triple DES."""
+    CipherClass = TripleDES
+    KEYS = (("3DES", "AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c"),)
+    ECB_PT_LEN = 16
+    ECB_PT_SEED = 0x30
+    CBC_KEY = "AABB09182736CCDD123456ABCD132536c0b7a8d05f3a829c"
+    CBC_IV = "1122334455667788"
+    CBC_PT_SEED = 0x30
+    CBC_PT_LEN = 16
 
-    def test_des_cbc_round_trip(self):
-        """Two blocks round trip through CBC with an explicit IV."""
-        cipher = DES()
-        cipher.generate_keys(bytes.fromhex(self.DES_KEY))
-        pt = bytes(0xA0 + i for i in range(16))
-        ct = cipher.encrypt(pt, mode="CBC", iv=bytes(8))
-        self.assertNotEqual(ct, pt)
-        self.assertEqual(cipher.decrypt(ct, mode="CBC", iv=bytes(8)), pt)
 
-    def test_triple_des_round_trip(self):
-        """Two blocks round trip through ECB and CBC under 3DES."""
-        for mode in ("ECB", "CBC"):
-            with self.subTest(mode=mode):
-                cipher = TripleDES()
-                cipher.generate_keys(bytes.fromhex(self.DES3_KEY))
-                pt = bytes(0x30 + i for i in range(16))
-                iv = (bytes.fromhex("1122334455667788") if mode == "CBC"
-                      else b"")
-                ct = cipher.encrypt(pt, mode=mode, iv=iv)
-                self.assertNotEqual(ct, pt)
-                self.assertEqual(cipher.decrypt(ct, mode=mode, iv=iv), pt)
+class DESPaddingTestCase(unittest.TestCase):
+    """PKCS#7 padding on 8-byte blocks."""
+    KEY = "AABB09182736CCDD"
 
     def test_pkcs7_padding(self):
         """A seven-byte message is padded up to one DES block and recovered."""
         cipher = DES()
-        cipher.generate_keys(bytes.fromhex(self.DES_KEY))
+        cipher.generate_keys(bytes.fromhex(self.KEY))
         pt = bytes.fromhex("123456abcdcd13")
         ct = cipher.encrypt(pt, mode="ECB", padding="PKCS")
         self.assertEqual(len(ct), 8)
