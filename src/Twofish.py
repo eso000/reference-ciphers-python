@@ -71,8 +71,13 @@ class Twofish(EncryptionBase):
 
     def g(self, x: int) -> int:
         """Key-dependent round function: the four keyed S-boxes XORed together."""
-        x = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
-        return self.sbox0[x[0]] ^ self.sbox1[x[1]] ^ self.sbox2[x[2]] ^ self.sbox3[x[3]]
+        byte_lanes = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
+        return (
+            self.sbox0[byte_lanes[0]]
+            ^ self.sbox1[byte_lanes[1]]
+            ^ self.sbox2[byte_lanes[2]]
+            ^ self.sbox3[byte_lanes[3]]
+        )
 
     def _h_mix(self, x: List[int], l0: List[List[int]]) -> List[int]:
         """Apply h's q permutations and key whitening to four bytes.
@@ -107,8 +112,8 @@ class Twofish(EncryptionBase):
 
     def h(self, x: int, l0: List[List[int]]) -> int:
         """Interleave q permutations with the key vector, then mix through the MDS matrix."""
-        x = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
-        return self.mds_lt_m(self._h_mix(x, l0))
+        byte_lanes = [int((x / (2 ** (8 * i))) % (2**8)) for i in range(4)]
+        return self.mds_lt_m(self._h_mix(byte_lanes, l0))
 
     def mds_lt_m(self, vec: List[int]) -> int:
         """Mix a 4-byte vector through the MDS matrix (Twofish, Section 2.2).
@@ -145,10 +150,10 @@ class Twofish(EncryptionBase):
         for l in s:
             l0.append([int((l / (2 ** (8 * (3 - i))) % (2**8))) for i in range(4)])
         l0 = l0[::-1]
-        s0 = [None] * 256
-        s1 = [None] * 256
-        s2 = [None] * 256
-        s3 = [None] * 256
+        s0: list[int] = [0] * 256
+        s1: list[int] = [0] * 256
+        s2: list[int] = [0] * 256
+        s3: list[int] = [0] * 256
         for i in range(256):
             x = self._h_mix([i, i, i, i], l0)
             # Each keyed S-box folds one q-permuted byte through the MDS
