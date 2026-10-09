@@ -2,7 +2,7 @@
 
 The package re-exports every cipher class so they can be imported directly::
 
-    from cryptology import AES
+    from refciphers import AES
 
 """
 

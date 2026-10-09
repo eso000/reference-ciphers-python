@@ -2,7 +2,7 @@
 
 import unittest
 
-from cryptology.AES import AES
+from refciphers.AES import AES
 from tests import cipher_test_base as base
 from tests.vectors import (
     AES_FIPS,

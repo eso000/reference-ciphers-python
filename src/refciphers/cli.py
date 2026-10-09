@@ -32,7 +32,7 @@ SECURITY_NOTICE = (
     "secrets."
 )
 
-# Public cipher name -> class, plus display metadata for ``cryptology info``.
+# Public cipher name -> class, plus display metadata for ``refciphers info``.
 CIPHER_TABLE: Tuple[Tuple[str, Type[EncryptionBase], str, str], ...] = (
     ("aes", AES, "16, 24, 32", "FIPS-197"),
     ("des", DES, "8", "FIPS 46-3"),
@@ -164,7 +164,7 @@ def cmd_info(_args: argparse.Namespace) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     """Build the argument parser with its encrypt/decrypt/info subcommands."""
     parser = argparse.ArgumentParser(
-        prog="cryptology",
+        prog="refciphers",
         description="Encrypt and decrypt messages with the bundled reference "
         "block ciphers.",
         epilog=SECURITY_NOTICE,
