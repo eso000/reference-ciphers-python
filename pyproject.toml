@@ -23,9 +23,15 @@ dependencies = []
 # Independent oracles used by examples/verify_vectors.py (pycrypto is the old name,
 # pycryptodome is the maintained fork providing the same Crypto.Cipher API).
 oracle = ["pycryptodome"]
+# Development tooling: pip install -e ".[dev]"
+dev = ["black", "mypy", "pylint"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
