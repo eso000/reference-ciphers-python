@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: System oracle libraries (libtomcrypt, nettle)
-        run: sudo apt-get update && sudo apt-get install -y libtomcrypt-dev libnettle-dev
+        run: sudo apt-get update && sudo apt-get install -y libtomcrypt-dev nettle-dev
       - name: Install dev and oracle extras
         run: pip install -e ".[dev,oracle]"
       - name: Unit tests
