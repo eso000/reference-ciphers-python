@@ -10,3 +10,7 @@ tags
 build/
 dist/
 *.egg-info/
+
+# Coverage reports
+.coverage
+coverage.xml

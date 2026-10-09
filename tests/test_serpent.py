@@ -12,7 +12,7 @@ ciphers (AltAgreementTestMixin), and the SBOXES appendix must hold the
 import random
 import unittest
 
-from src.Serpent import SBOXES, Serpent
+from cryptology.Serpent import SBOXES, Serpent
 from tests import cipher_test_base as base
 from tests.vectors import SERPENT_KATS
 

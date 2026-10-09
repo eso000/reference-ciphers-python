@@ -7,11 +7,11 @@ boundaries. Keys, blocks and IVs of the wrong length are rejected outright.
 
 import unittest
 
-from src.AES import AES
-from src.Blowfish import Blowfish
-from src.DES import DES, TripleDES
-from src.Serpent import Serpent
-from src.Twofish import Twofish
+from cryptology.AES import AES
+from cryptology.Blowfish import Blowfish
+from cryptology.DES import DES, TripleDES
+from cryptology.Serpent import Serpent
+from cryptology.Twofish import Twofish
 
 MODES = ("ECB", "CBC", "PCBC", "CFB", "OFB", "CTR")
 PADDED_MODES = ("ECB", "CBC", "PCBC")

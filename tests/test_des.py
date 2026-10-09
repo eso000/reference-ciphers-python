@@ -9,7 +9,7 @@ each other, verifies that both use_alt settings compute the same cipher
 import random
 import unittest
 
-from src.DES import (
+from cryptology.DES import (
     DES,
     TripleDES,
     IP,

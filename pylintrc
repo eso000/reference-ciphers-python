@@ -14,11 +14,11 @@
 #                      same small test-method shapes instead of sharing an
 #                      abstract base, so each suite reads standalone.
 
-# The scripts under examples/ import the repo-root src/ and tests/ packages.
-# pylint puts each file's own directory on sys.path rather than the current
-# working directory, so without this the root would not be importable from
-# examples/ and every such import would be reported as an import-error.
-init-hook='import sys; sys.path.insert(0, ".")'
+# The scripts under examples/ import the ``cryptology`` package (under src/)
+# and the repo-root tests/ package. pylint puts each file's own directory on
+# sys.path rather than the current working directory, so without this neither
+# import would resolve and every one would be reported as an import-error.
+init-hook='import sys; sys.path.insert(0, "src"); sys.path.insert(0, ".")'
 
 [BASIC]
 # Module files carry proper-cased cipher names (AES.py, Twofish.py, ...).
