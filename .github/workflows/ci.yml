@@ -48,9 +48,14 @@ jobs:
           coverage run -m unittest discover -s tests -t tests
           coverage xml -o coverage.xml
           coverage report -m
+          {
+            echo "### Coverage (Python ${{ matrix.python-version }})"
+            coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@v4
         with:
-          file: coverage.xml
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false

@@ -1,5 +1,6 @@
-# Cryptology: reference block-cipher implementations in pure Python
+# refciphers: reference block-cipher implementations in pure Python
 
+[![CI](https://github.com/eso000/reference-ciphers-python/actions/workflows/ci.yml/badge.svg)](https://github.com/eso000/reference-ciphers-python/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Dependencies: none](https://img.shields.io/badge/dependencies-none-brightgreen)
@@ -10,8 +11,9 @@ is spelled out step by step, and every cipher is checked against the official
 published test vectors, against an independent implementation of the same math,
 and, where available, against a third-party crypto library used as an oracle.
 
-Imported as the `cryptology` package, installed as the `reference-ciphers-python`
-distribution, and used from the shell through the `cryptology` command.
+Imported as the `refciphers` package, installed as the `reference-ciphers-python`
+distribution, and used from the shell through the `refciphers` command. (The
+import name is deliberately not `cryptology`, which is an unrelated project on PyPI.)
 
 ## Background
 
@@ -31,10 +33,10 @@ to demonstrate correctness rather than merely assert it.
   independent oracles.
 - **Six block modes** — ECB, CBC, PCBC, CFB, OFB and CTR, shared by every cipher
   through a single base class.
-- **A command-line front end** — `cryptology encrypt` / `decrypt` / `info`, a
+- **A command-line front end** — `refciphers encrypt` / `decrypt` / `info`, a
   thin wrapper over the same bytes-only API.
 - **Strict, predictable API** — bytes in, bytes out; wrong lengths raise
-  `ValueError`, hex strings raise `TypeError`, and nothing is silently adjusted.
+  `ValueError`, hex strings raise `TypeError`.
 - **Written to be read** — internals follow the specifications rather than
   micro-optimized tricks; DES's initial/final permutation is the one credited
   exception (see [References and attribution](#references-and-attribution)).
@@ -66,7 +68,7 @@ pip install -e .                  # once, from the repository root
 ```
 
 ```python
-from cryptology import AES
+from refciphers import AES
 
 c = AES()
 c.generate_keys(bytes.fromhex("000102030405060708090a0b0c0d0e0f"))
@@ -77,7 +79,7 @@ c.encrypt_block(bytes.fromhex("00112233445566778899aabbccddeeff")).hex()
 Without installing (everything still works through `PYTHONPATH=src`):
 
 ```bash
-PYTHONPATH=src python3 -c "from cryptology import AES; print(AES)"
+PYTHONPATH=src python3 -c "from refciphers import AES; print(AES)"
 ```
 
 For whole messages, `encrypt` / `decrypt` handle any length. The default mode is
@@ -96,16 +98,16 @@ pt = c.decrypt(ct, mode="CBC", padding="ISO 7816-4", iv=iv)
 
 ## Command line
 
-The `cryptology` command wraps the Python API, with no key derivation and no
+The `refciphers` command wraps the Python API, with no key derivation and no
 authentication added:
 
 ```bash
-cryptology info                        # supported ciphers, modes and padding
-cryptology --version
+refciphers info                        # supported ciphers, modes and padding
+refciphers --version
 
-cryptology encrypt --cipher aes --key 000102030405060708090a0b0c0d0e0f \
+refciphers encrypt --cipher aes --key 000102030405060708090a0b0c0d0e0f \
     --mode CBC --iv random -i plain.txt -o cipher.bin
-cryptology decrypt --cipher aes --key 000102030405060708090a0b0c0d0e0f \
+refciphers decrypt --cipher aes --key 000102030405060708090a0b0c0d0e0f \
     --mode CBC --iv 19dc9fa9a4e6a1b2c3d4e5f6a7b8c9d0 -i cipher.bin -o plain.out
 ```
 
@@ -115,7 +117,7 @@ cryptology decrypt --cipher aes --key 000102030405060708090a0b0c0d0e0f \
 - Keys are given as hex with `--key`, or as raw bytes through `--key-file`.
 - `-i`/`-o` default to stdin/stdout; `--format hex` reads or writes hex
   ciphertext instead of raw bytes.
-- `cryptology info` lists every supported cipher with its block and key sizes.
+- `refciphers info` lists every supported cipher with its block and key sizes.
 
 The command is a reference/education tool — see the [Security
 notice](#security-notice) at the bottom.
@@ -123,7 +125,7 @@ notice](#security-notice) at the bottom.
 ## Architecture
 
 All ciphers share one base class, `EncryptionBase` in
-`src/cryptology/encryption_base.py`. It provides the common building blocks
+`src/refciphers/encryption_base.py`. It provides the common building blocks
 (byte-level XOR, bit permutations, rotations, padding) and the block-mode
 `encrypt` / `decrypt`, which take and return `bytes`.
 
@@ -159,8 +161,7 @@ string — raises `TypeError`, so there is no ambiguity about encoding.
 `encrypt` / `decrypt` handle arbitrary-length data; `encrypt_block` /
 `decrypt_block` take and return exactly one block.
 
-Lengths are checked strictly and never silently adjusted; a wrong length raises
-`ValueError`:
+Lengths are checked strictly; a wrong length raises `ValueError`:
 
 - **Keys** — AES, Twofish and Serpent: exactly 16, 24 or 32 bytes (Serpent
   applies the specification's `0x01` padding to 16- and 24-byte keys
@@ -206,7 +207,7 @@ enforces a 90% floor.
 | `tests/test_serpent.py` | the NESSIE/verified sets, plus S-box cross-checks |
 | `tests/test_encryption_base.py` | padding schemes and shared helpers |
 | `tests/test_modes.py` | all six modes, padding and length validation |
-| `tests/test_cli.py` | the `cryptology` command: round-trips, random IV, `info`, error exits |
+| `tests/test_cli.py` | the `refciphers` command: round-trips, random IV, `info`, error exits |
 | `tests/vectors.py` | the vector data itself, shared with `examples/verify_vectors.py` |
 
 ### Cross-implementation harness
@@ -235,7 +236,7 @@ python3 -m examples.benchmark
 
 Both are run as modules (`python3 -m ...`) from the repository root, so the
 repository root ends up on `sys.path` and the `tests` package resolves; the
-editable install makes `cryptology` importable.
+editable install makes `refciphers` importable.
 
 On a machine with all three libraries installed, the harness prints:
 
@@ -321,12 +322,12 @@ run is meaningful.
 ## Project layout
 
 ```
-pyproject.toml         Packaging metadata (src layout, no runtime deps); console script `cryptology`
+pyproject.toml         Packaging metadata (src layout, no runtime deps); console script `refciphers`
 src/
-  cryptology/
+  refciphers/
     __init__.py        Re-exports every cipher class
-    cli.py             `cryptology` command: encrypt / decrypt / info
-    __main__.py        Enables `python -m cryptology`
+    cli.py             `refciphers` command: encrypt / decrypt / info
+    __main__.py        Enables `python -m refciphers`
     encryption_base.py Shared base class: XOR/permutation/rotation, mode-aware padding, all block modes
     AES.py             AES implementation
     DES.py             DES and 3DES implementations
@@ -344,7 +345,7 @@ tests/
   test_serpent.py      NESSIE/verified sets, S-box cross-checks
   test_encryption_base.py  Padding schemes and shared helpers
   test_modes.py        All block modes, padding and length validation
-  test_cli.py          The `cryptology` command line
+  test_cli.py          The `refciphers` command line
 
 examples/
   verify_vectors.py    In-repo + external-oracle verification harness
@@ -396,7 +397,7 @@ ANSI X9.23, ISO/IEC 7816-4, trailing bit complement, and zero padding.
 ### Borrowed code
 
 The ciphers are written from the specifications, with one exception. The DES
-initial and final permutations in `src/cryptology/DES.py` use a delta-swap
+initial and final permutations in `src/refciphers/DES.py` use a delta-swap
 bit-network — Wei Dai's variant of Richard Outerbridge's IP/FP algorithm —
 instead of a per-bit table loop. The table-driven path it replaces is kept
 behind `use_alt=False`, and `tests/test_des.py` checks that the two agree.
