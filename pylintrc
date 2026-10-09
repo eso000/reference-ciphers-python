@@ -1,20 +1,24 @@
 [MASTER]
-# This is a teaching library; the "unfixable" refactor warnings below are
-# silenced because the code is deliberately written step-by-step for legibility:
-#  - too-many-lines:   Blowfish's 1149 spec-table (P/S-box data) lines.
-#  - too-many-*:       Serpent's hardcoded 16 S-box gate networks and
-#                      Twofish's verbose key schedule.
-#  - arguments-differ: rotl/rotr re-define the base-class (list) signature for
-#                      integer rotation - an intentional, documented override.
-#  - too-many-arguments/positional: encrypt_mode/decrypt_mode expose the
-#                      block/mode/padding/iv interface as a flat, teachable API.
-#  - too-many-public-methods: EncryptionBase exposes every conversion and
-#                      mode/padding helper as a public, teachable method.
-#  - duplicate-code:   the per-cipher test modules intentionally repeat the
-#                      same small test-method shapes instead of sharing an
-#                      abstract base, so each suite reads standalone.
+# This is a teaching library; the refactor warnings below are silenced because
+# the code is deliberately written step by step for legibility:
+#  - too-many-lines:       DES.py and Blowfish.py are over 1000 lines because
+#                          they hold the spec's constant tables (S-boxes,
+#                          P-array, permutations).
+#  - too-many-statements, too-many-branches, too-many-return-statements:
+#                          Serpent's sixteen hard-coded S-box gate networks
+#                          (one long function) and the match/case dispatch in
+#                          EncryptionBase.pad_for_mode.
+#  - too-many-locals:      Twofish's verbose key schedule and the oracle
+#                          harness in examples/verify_vectors.py.
+#  - too-many-arguments, too-many-positional-arguments:
+#                          one helper in examples/benchmark.py takes six
+#                          arguments.
+#  - duplicate-code:       the test modules all end with the same short
+#                          ``unittest.main()`` boilerplate and near-identical
+#                          one-line assertions, which pylint reports as
+#                          duplicates.
 
-# The scripts under examples/ import the ``cryptology`` package (under src/)
+# The scripts under examples/ import the ``refciphers`` package (under src/)
 # and the repo-root tests/ package. pylint puts each file's own directory on
 # sys.path rather than the current working directory, so without this neither
 # import would resolve and every one would be reported as an import-error.
@@ -30,8 +34,6 @@ disable=too-many-lines,
     too-many-branches,
     too-many-locals,
     too-many-statements,
-    arguments-differ,
     too-many-arguments,
     too-many-positional-arguments,
-    too-many-public-methods,
     duplicate-code
