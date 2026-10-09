@@ -27,7 +27,7 @@ class Serpent(EncryptionBase):
     block_size = 16  # 128 bits = 16 bytes
 
     def __init__(self, use_alt: bool = True):
-        self.subkeys = []
+        self.subkeys: list[list[int]] = []
         self.use_alt = use_alt
 
     def _sbox(self, x, n, d=0):
