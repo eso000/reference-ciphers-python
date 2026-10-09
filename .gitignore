@@ -3,3 +3,10 @@ __pycache__/
 tags
 *.swp
 *~
+
+# Tool caches and build artifacts
+.mypy_cache/
+.pytest_cache/
+build/
+dist/
+*.egg-info/
