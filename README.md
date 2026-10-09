@@ -297,8 +297,29 @@ pylintrc             Lint configuration for the teaching-style code
 - Python 3.10+
 - No third-party packages are required to use the ciphers or run the built-in
   tests.
-- Optional: pycrypto (or pycryptodome), libtomcrypt and GNU nettle enable the
-  independent oracle checks in `examples/verify_vectors.py`.
+- Optional: `pip install -e ".[oracle]"` pulls in pycryptodome; alongside a
+  system libtomcrypt and GNU nettle it enables the independent oracle checks in
+  `examples/verify_vectors.py`.
+- Optional: `pip install -e ".[dev]"` installs the lint, format and type-check
+  tools — see [Development](#development).
+
+## Development
+
+The ciphers and tests need nothing beyond the standard library, but the quality
+gates below do. Install them once as the optional `dev` extra:
+
+```bash
+pip install -e ".[dev]"     # black, mypy, pylint
+pip install -e ".[oracle]"  # pycryptodome, for the external oracle checks
+```
+
+Then the repository checks itself with:
+
+```bash
+black --check src tests examples   # formatting
+mypy                               # types (configuration in pyproject.toml)
+pylint src tests examples          # lint (configuration in pylintrc)
+```
 
 ## Security notice
 
