@@ -40,8 +40,13 @@ PROGRAMS = vector_programs()
 
 def get_impl(cipher: str):
     """Return (generate_keys, encrypt_block, decrypt_block) for ``cipher``."""
-    classes = {"AES": AES, "DES": DES, "Blowfish": Blowfish,
-               "Twofish": Twofish, "Serpent": Serpent}
+    classes = {
+        "AES": AES,
+        "DES": DES,
+        "Blowfish": Blowfish,
+        "Twofish": Twofish,
+        "Serpent": Serpent,
+    }
     obj = classes[cipher]()
     return obj.generate_keys, obj.encrypt_block, obj.decrypt_block
 
@@ -51,6 +56,7 @@ def official_oracles() -> Dict[str, List[Tuple[str, Callable, Callable]]]:
     found: Dict[str, List[Tuple[str, Callable, Callable]]] = {}
 
     if PY_AES is not None:
+
         def ecb(mod):
             def enc(key: bytes, pt: bytes) -> str:
                 return mod.new(key, mod.MODE_ECB).encrypt(pt).hex()

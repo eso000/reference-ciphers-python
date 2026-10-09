@@ -85,8 +85,6 @@ class NativeOracle:
         entry point. The result is dominated by ctypes overhead.
     """
 
-
-
     def __init__(self, name, library, block_size, granularity, enc, dec):
         self.name = name
         self.library = library
@@ -171,9 +169,7 @@ def measure_cipher(cls, data, rounds, modes):
 
         ciphertext = obj.encrypt(data, mode=mode, iv=iv)
         entry["bytes"] = len(ciphertext)
-        seconds = best_of(
-            lambda m=mode, i=iv: obj.encrypt(data, mode=m, iv=i), rounds
-        )
+        seconds = best_of(lambda m=mode, i=iv: obj.encrypt(data, mode=m, iv=i), rounds)
         entry["encrypt_kbs"] = rate(len(ciphertext), seconds)
 
         seconds = best_of(
@@ -320,8 +316,7 @@ def parse_args(argv):
         "--rounds",
         type=int,
         default=5,
-        help="timed runs per measurement; the fastest is reported "
-        "(default: 5)",
+        help="timed runs per measurement; the fastest is reported " "(default: 5)",
     )
     parser.add_argument(
         "--mode",
