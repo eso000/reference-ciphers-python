@@ -6,7 +6,7 @@ helpers the ciphers inherit, without needing a specific cipher.
 
 import unittest
 
-from cryptology.encryption_base import EncryptionBase
+from refciphers.encryption_base import EncryptionBase
 
 
 class DummyCipher(EncryptionBase):

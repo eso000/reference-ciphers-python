@@ -36,7 +36,7 @@ oracle = ["pycryptodome"]
 dev = ["black", "mypy", "pylint", "coverage[toml]"]
 
 [project.scripts]
-cryptology = "cryptology.cli:main"
+refciphers = "refciphers.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -49,7 +49,7 @@ python_version = "3.10"
 files = ["src"]
 
 [tool.coverage.run]
-source = ["cryptology"]
+source = ["refciphers"]
 branch = true
 omit = ["*/__main__.py"]
 

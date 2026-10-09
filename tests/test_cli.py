@@ -1,4 +1,4 @@
-"""Tests for the ``cryptology`` command-line interface.
+"""Tests for the ``refciphers`` command-line interface.
 
 Walks encrypt/decrypt round trips (raw and hex ciphertext), the random-IV
 path, ``info``, and the failure modes (missing key, bad hex, ECB with an IV,
@@ -12,7 +12,7 @@ import os
 import tempfile
 import unittest
 
-from cryptology.cli import main
+from refciphers.cli import main
 
 KEY = "000102030405060708090a0b0c0d0e0f"
 IV = "101112131415161718191a1b1c1d1e1f"

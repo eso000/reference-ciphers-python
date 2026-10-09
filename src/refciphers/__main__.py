@@ -1,4 +1,4 @@
-"""Entry point for ``python -m cryptology``."""
+"""Entry point for ``python -m refciphers``."""
 
 from .cli import main
 

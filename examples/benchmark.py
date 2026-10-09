@@ -32,11 +32,11 @@ import platform
 import sys
 import time
 
-from cryptology.AES import AES
-from cryptology.Blowfish import Blowfish
-from cryptology.DES import DES, TripleDES
-from cryptology.Serpent import Serpent
-from cryptology.Twofish import Twofish
+from refciphers.AES import AES
+from refciphers.Blowfish import Blowfish
+from refciphers.DES import DES, TripleDES
+from refciphers.Serpent import Serpent
+from refciphers.Twofish import Twofish
 
 try:
     from Crypto.Cipher import AES as PY_AES, Blowfish as PY_BF

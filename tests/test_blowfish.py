@@ -2,7 +2,7 @@
 
 import unittest
 
-from cryptology.Blowfish import Blowfish
+from refciphers.Blowfish import Blowfish
 from tests import cipher_test_base as base
 from tests.vectors import BLOWFISH_OFFICIAL, BLOWFISH_SET_KEY, BLOWFISH_SET_KEY_PT
 
