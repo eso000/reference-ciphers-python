@@ -6,7 +6,7 @@ keys; the 128 chain continues the all-zero ciphertext as the next plaintext.
 
 import unittest
 
-from src.Twofish import Twofish
+from cryptology.Twofish import Twofish
 from tests import cipher_test_base as base
 from tests.vectors import TWOFISH_KATS
 

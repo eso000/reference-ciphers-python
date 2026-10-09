@@ -3,13 +3,22 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cryptology-python"
+name = "reference-ciphers-python"
 version = "0.1.0"
-description = "From-scratch, teaching-oriented block cipher implementations with official test vectors"
+description = "From-scratch reference implementations of classic block ciphers, verified against official test vectors"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-keywords = ["cryptography", "aes", "des", "blowfish", "twofish", "serpent", "education"]
+keywords = [
+    "cryptography",
+    "aes",
+    "des",
+    "blowfish",
+    "twofish",
+    "serpent",
+    "reference-implementation",
+    "education",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Education",
@@ -24,7 +33,10 @@ dependencies = []
 # pycryptodome is the maintained fork providing the same Crypto.Cipher API).
 oracle = ["pycryptodome"]
 # Development tooling: pip install -e ".[dev]"
-dev = ["black", "mypy", "pylint"]
+dev = ["black", "mypy", "pylint", "coverage[toml]"]
+
+[project.scripts]
+cryptology = "cryptology.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -35,3 +47,12 @@ where = ["src"]
 [tool.mypy]
 python_version = "3.10"
 files = ["src"]
+
+[tool.coverage.run]
+source = ["cryptology"]
+branch = true
+omit = ["*/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90

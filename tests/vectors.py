@@ -19,6 +19,9 @@ Twofish   the official KATs (Schneier et al., B.2) for 128/192/256-bit keys;
           the 128 chain continues the all-zero ciphertext as next plaintext.
 Serpent   the official NESSIE/verified sets 1-4 for 128/192/256-bit keys as
           published by Biham et al., in little-endian octet order.
+
+The specifications themselves, and the constant tables each cipher draws on,
+are collected in the repository README under "References and attribution".
 """
 
 # Each entry is (name, key_hex, plaintext_hex, ciphertext_hex).

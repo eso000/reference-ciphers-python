@@ -38,6 +38,9 @@ class EncryptionBase:
         shifts %= width
         return ((val >> shifts) | (val << (width - shifts))) % (1 << width)
 
+    def generate_keys(self, key: bytes) -> None:
+        """Placeholder: key schedule; overridden by each cipher."""
+
     def encrypt_block(self, plaintext: bytes) -> bytes:
         """Placeholder: single-block encryption, overridden by each cipher."""
         return plaintext

@@ -4,7 +4,7 @@ Times every cipher in every block mode that ``EncryptionBase`` implements, in
 both directions, and compares the pure-Python implementations against any
 installed native crypto library that offers the same cipher.
 
-Run from the repository root so that the ``src`` package is importable::
+Run from the repository root after an editable install (``pip install -e .``)::
 
     python3 -m examples.benchmark
     python3 -m examples.benchmark --rounds 9 --bytes 65536
@@ -32,11 +32,11 @@ import platform
 import sys
 import time
 
-from src.AES import AES
-from src.Blowfish import Blowfish
-from src.DES import DES, TripleDES
-from src.Serpent import Serpent
-from src.Twofish import Twofish
+from cryptology.AES import AES
+from cryptology.Blowfish import Blowfish
+from cryptology.DES import DES, TripleDES
+from cryptology.Serpent import Serpent
+from cryptology.Twofish import Twofish
 
 try:
     from Crypto.Cipher import AES as PY_AES, Blowfish as PY_BF

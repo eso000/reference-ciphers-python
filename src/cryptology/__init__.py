@@ -1,4 +1,10 @@
-"""Cryptography algorithms package."""
+"""Reference implementations of classic block ciphers.
+
+The package re-exports every cipher class so they can be imported directly::
+
+    from cryptology import AES
+
+"""
 
 from .AES import AES
 from .Blowfish import Blowfish
@@ -16,3 +22,5 @@ __all__ = [
     "Twofish",
     "EncryptionBase",
 ]
+
+__version__ = "0.1.0"

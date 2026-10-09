@@ -19,11 +19,11 @@ The script exits non-zero if any vector fails or any oracle disagrees.
 import ctypes
 from typing import Callable, Dict, List, Tuple
 
-from src.AES import AES
-from src.Blowfish import Blowfish
-from src.DES import DES
-from src.Serpent import Serpent
-from src.Twofish import Twofish
+from cryptology.AES import AES
+from cryptology.Blowfish import Blowfish
+from cryptology.DES import DES
+from cryptology.Serpent import Serpent
+from cryptology.Twofish import Twofish
 
 from tests.vectors import programs as vector_programs
 
