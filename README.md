@@ -180,6 +180,32 @@ python3 -m examples.benchmark
 Both are run as modules (`python3 -m ...`) from the repository root, so the
 repository root ends up on `sys.path` and the `src` and `tests` imports resolve.
 
+On a machine with all three libraries installed, the harness prints:
+
+```text
+== AES ==
+  in-repo  : 3/3 passed
+  pycrypto   : 3/3 passed
+
+== DES ==
+  in-repo  : 3/3 passed
+  pycrypto   : 3/3 passed
+
+== Blowfish ==
+  in-repo  : 55/55 passed
+  pycrypto   : 55/55 passed
+
+== Twofish ==
+  in-repo  : 5/5 passed
+  libtomcrypt: 5/5 passed
+
+== Serpent ==
+  in-repo  : 16/16 passed
+  nettle     : 16/16 passed
+
+ALL VECTORS PASSED for in-repo ciphers and all detected oracles
+```
+
 ### Benchmark
 
 `examples/benchmark.py` times every cipher three ways: key setup, the raw
@@ -196,6 +222,33 @@ python3 -m examples.benchmark --rounds 9            # steadier figures
 python3 -m examples.benchmark --cipher AES --mode CBC --mode CTR
 python3 -m examples.benchmark --no-native           # skip the C libraries
 python3 -m examples.benchmark --json                # machine-readable
+```
+
+A trimmed run (best of 9, 4096-byte message) looks like this — the numbers are
+from one machine and one run: see the caveats below.
+
+```text
+Block cipher throughput: 4096 bytes, best of 9 run(s), Python 3.14.7 on Linux
+Pure-Python implementations, KB/s
+
+cipher     block  key    key setup   raw enc   raw dec
+------------------------------------------------------
+DES            8    8       9115/s      71.3      65.8
+TripleDES      8   24       2603/s      22.6      22.5
+Blowfish       8   16        192/s     681.3     716.5
+AES           16   16      40130/s      57.3      30.3
+Serpent       16   32      10022/s     126.2     126.7
+Twofish       16   32        130/s     268.2     291.1
+
+Native libraries, ECB only, KB/s
+  'bulk' = one native call for the whole message; 'block' = one FFI call per block (overhead-dominated)
+
+  (DES, TripleDES, Serpent and Twofish rows omitted)
+
+  AES        pycryptodome  [bulk] enc   268092.3   dec   286730.4
+             this repo     [pure-Python] enc       67.1   dec       30.1   -> native is 3993.3x the encrypt rate
+  Blowfish   pycryptodome  [bulk] enc   140818.0   dec   147525.1
+             this repo     [pure-Python] enc      901.6   dec      844.7   -> native is 156.2x the encrypt rate
 ```
 
 Two results are worth noting because they are counter-intuitive. **Blowfish is
